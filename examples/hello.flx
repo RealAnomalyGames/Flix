@@ -1,2 +1,3 @@
-let score = 100
-prt(score)
+prt("One")
+prt("Two")
+prt("Three")

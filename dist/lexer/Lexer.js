@@ -13,6 +13,10 @@ class Lexer {
     tokenize() {
         const tokens = [];
         while (!this.isAtEnd()) {
+            this.skipWhitespaceAndComments();
+            if (this.isAtEnd()) {
+                break;
+            }
             const token = this.nextToken();
             if (token !== null) {
                 tokens.push(token);
@@ -22,10 +26,6 @@ class Lexer {
         return tokens;
     }
     nextToken() {
-        this.skipWhitespace();
-        if (this.isAtEnd()) {
-            return null;
-        }
         const startLine = this.line;
         const startColumn = this.column;
         const c = this.advance();
@@ -46,14 +46,28 @@ class Lexer {
                 return new Token_1.Token(Token_1.TokenType.RightParen, c, startLine, startColumn);
             case ',':
                 return new Token_1.Token(Token_1.TokenType.Comma, c, startLine, startColumn);
+            case '"':
+                return this.readString(startLine, startColumn);
         }
         if (this.isDigit(c)) {
             return this.readNumber(c, startLine, startColumn);
         }
-        if (this.isLetter(c)) {
+        if (this.isLetter(c) || c === '_') {
             return this.readIdentifier(c, startLine, startColumn);
         }
         return new Token_1.Token(Token_1.TokenType.Unknown, c, startLine, startColumn);
+    }
+    readString(line, column) {
+        let value = "";
+        while (!this.isAtEnd() && this.peek() !== '"') {
+            value += this.advance();
+        }
+        if (this.isAtEnd()) {
+            return new Token_1.Token(Token_1.TokenType.Unknown, value, line, column);
+        }
+        // Consume closing quote
+        this.advance();
+        return new Token_1.Token(Token_1.TokenType.String, value, line, column);
     }
     readNumber(first, line, column) {
         let value = first;
@@ -80,22 +94,32 @@ class Lexer {
                 return new Token_1.Token(Token_1.TokenType.Identifier, value, line, column);
         }
     }
-    skipWhitespace() {
+    skipWhitespaceAndComments() {
         while (!this.isAtEnd()) {
             const c = this.peek();
-            if (c === ' ' || c === '\t' || c === '\r') {
+            // Whitespace
+            if (c === ' ' || c === '\t' || c === '\r' || c === '\n') {
                 this.advance();
+                continue;
             }
-            else if (c === '\n') {
-                this.advance();
+            // Single-line comment //
+            if (c === '/' && this.peekNext() === '/') {
+                while (!this.isAtEnd() && this.peek() !== '\n') {
+                    this.advance();
+                }
+                continue;
             }
-            else {
-                break;
-            }
+            break;
         }
     }
     peek() {
         return this.source[this.position];
+    }
+    peekNext() {
+        if (this.position + 1 >= this.source.length) {
+            return '\0';
+        }
+        return this.source[this.position + 1];
     }
     advance() {
         const c = this.source[this.position++];

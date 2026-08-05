@@ -35,9 +35,12 @@ var __importStar = (this && this.__importStar) || (function () {
 Object.defineProperty(exports, "__esModule", { value: true });
 const fs = __importStar(require("fs"));
 const Lexer_1 = require("./lexer/Lexer");
-const source = fs.readFileSync("examples/hello.flx", "utf8");
+const Parser_1 = require("./parser/Parser");
+const Interpreter_1 = require("./interpreter/Interpreter");
+const source = fs.readFileSync("examples/variables.flx", "utf8");
 const lexer = new Lexer_1.Lexer(source);
 const tokens = lexer.tokenize();
-for (const token of tokens) {
-    console.log(token.toString());
-}
+const parser = new Parser_1.Parser(tokens);
+const program = parser.parse();
+const interpreter = new Interpreter_1.Interpreter();
+interpreter.interpret(program);

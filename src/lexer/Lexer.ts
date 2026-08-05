@@ -14,6 +14,12 @@ export class Lexer {
 
         while (!this.isAtEnd()) {
 
+            this.skipWhitespaceAndComments();
+
+            if (this.isAtEnd()) {
+                break;
+            }
+
             const token = this.nextToken();
 
             if (token !== null) {
@@ -34,12 +40,6 @@ export class Lexer {
     }
 
     private nextToken(): Token | null {
-
-        this.skipWhitespace();
-
-        if (this.isAtEnd()) {
-            return null;
-        }
 
         const startLine = this.line;
         const startColumn = this.column;
@@ -72,13 +72,16 @@ export class Lexer {
             case ',':
                 return new Token(TokenType.Comma, c, startLine, startColumn);
 
+            case '"':
+                return this.readString(startLine, startColumn);
+
         }
 
         if (this.isDigit(c)) {
             return this.readNumber(c, startLine, startColumn);
         }
 
-        if (this.isLetter(c)) {
+        if (this.isLetter(c) || c === '_') {
             return this.readIdentifier(c, startLine, startColumn);
         }
 
@@ -88,6 +91,25 @@ export class Lexer {
             startLine,
             startColumn
         );
+
+    }
+
+    private readString(line: number, column: number): Token {
+
+        let value = "";
+
+        while (!this.isAtEnd() && this.peek() !== '"') {
+            value += this.advance();
+        }
+
+        if (this.isAtEnd()) {
+            return new Token(TokenType.Unknown, value, line, column);
+        }
+
+        // Consume closing quote
+        this.advance();
+
+        return new Token(TokenType.String, value, line, column);
 
     }
 
@@ -134,21 +156,29 @@ export class Lexer {
 
     }
 
-    private skipWhitespace(): void {
+    private skipWhitespaceAndComments(): void {
 
         while (!this.isAtEnd()) {
 
             const c = this.peek();
 
-            if (c === ' ' || c === '\t' || c === '\r') {
+            // Whitespace
+            if (c === ' ' || c === '\t' || c === '\r' || c === '\n') {
                 this.advance();
+                continue;
             }
-            else if (c === '\n') {
-                this.advance();
+
+            // Single-line comment //
+            if (c === '/' && this.peekNext() === '/') {
+
+                while (!this.isAtEnd() && this.peek() !== '\n') {
+                    this.advance();
+                }
+
+                continue;
             }
-            else {
-                break;
-            }
+
+            break;
 
         }
 
@@ -156,6 +186,16 @@ export class Lexer {
 
     private peek(): string {
         return this.source[this.position];
+    }
+
+    private peekNext(): string {
+
+        if (this.position + 1 >= this.source.length) {
+            return '\0';
+        }
+
+        return this.source[this.position + 1];
+
     }
 
     private advance(): string {
