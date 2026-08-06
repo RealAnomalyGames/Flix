@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Parser = void 0;
 const Token_1 = require("../lexer/Token");
+const Errors_1 = require("../runtime/Errors");
 const Nodes_1 = require("../ast/Nodes");
 class Parser {
     tokens;
@@ -23,21 +24,44 @@ class Parser {
         if (this.match(Token_1.TokenType.Prt)) {
             return this.printStatement();
         }
-        throw new Error(`Unexpected token '${this.peek().value}'`);
+        const token = this.peek();
+        throw new Errors_1.SyntaxError(`Unexpected token '${token.value}'.`, token.line, token.column);
     }
     letStatement() {
         const name = this.consume(Token_1.TokenType.Identifier).value;
         this.consume(Token_1.TokenType.Equals);
-        const value = this.expression();
-        return new Nodes_1.LetStatement(name, value);
+        return new Nodes_1.LetStatement(name, this.expression());
     }
     printStatement() {
         this.consume(Token_1.TokenType.LeftParen);
-        const expression = this.expression();
+        const value = this.expression();
         this.consume(Token_1.TokenType.RightParen);
-        return new Nodes_1.PrintStatement(expression);
+        return new Nodes_1.PrintStatement(value);
     }
     expression() {
+        return this.addition();
+    }
+    addition() {
+        let expression = this.multiplication();
+        while (this.match(Token_1.TokenType.Plus) ||
+            this.match(Token_1.TokenType.Minus)) {
+            const operator = this.previous().value;
+            const right = this.multiplication();
+            expression = new Nodes_1.BinaryExpression(expression, operator, right);
+        }
+        return expression;
+    }
+    multiplication() {
+        let expression = this.primary();
+        while (this.match(Token_1.TokenType.Star) ||
+            this.match(Token_1.TokenType.Slash)) {
+            const operator = this.previous().value;
+            const right = this.primary();
+            expression = new Nodes_1.BinaryExpression(expression, operator, right);
+        }
+        return expression;
+    }
+    primary() {
         if (this.match(Token_1.TokenType.Number)) {
             return new Nodes_1.NumberLiteral(Number(this.previous().value));
         }
@@ -47,7 +71,13 @@ class Parser {
         if (this.match(Token_1.TokenType.Identifier)) {
             return new Nodes_1.Identifier(this.previous().value);
         }
-        throw new Error("Expected expression");
+        if (this.match(Token_1.TokenType.LeftParen)) {
+            const expression = this.expression();
+            this.consume(Token_1.TokenType.RightParen);
+            return expression;
+        }
+        const token = this.peek();
+        throw new Errors_1.SyntaxError("Expected expression.", token.line, token.column);
     }
     match(type) {
         if (!this.check(type)) {
@@ -60,7 +90,8 @@ class Parser {
         if (this.check(type)) {
             return this.tokens[this.current++];
         }
-        throw new Error(`Expected ${Token_1.TokenType[type]}, found ${Token_1.TokenType[this.peek().type]}`);
+        const token = this.peek();
+        throw new Errors_1.SyntaxError(`Expected ${Token_1.TokenType[type]}.`, token.line, token.column);
     }
     check(type) {
         if (this.isAtEnd()) {

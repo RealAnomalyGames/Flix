@@ -1,0 +1,9 @@
+// Operator precedence
+
+prt(2 + 3 * 4)
+
+prt((2 + 3) * 4)
+
+prt(10 - 2 * 3)
+
+prt((10 - 2) * 3)

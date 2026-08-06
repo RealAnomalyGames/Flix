@@ -1,0 +1,7 @@
+// String literals
+
+let msg = "Welcome to Flix!"
+
+prt(msg)
+
+prt("Strings work!")

@@ -10,6 +10,7 @@ import {
     BinaryExpression
 } from "../ast/Nodes";
 
+import { RuntimeError } from "../runtime/Errors";
 import { Environment } from "../runtime/Environment";
 
 export class Interpreter {
@@ -36,9 +37,7 @@ export class Interpreter {
             return;
         }
 
-        throw new Error(
-            `Unknown statement '${statement.kind}'.`
-        );
+        throw new Error("Unknown statement.");
 
     }
 
@@ -55,11 +54,9 @@ export class Interpreter {
 
     private executePrint(statement: PrintStatement): void {
 
-        const value = this.evaluate(
-            statement.expression
+        console.log(
+            this.evaluate(statement.expression)
         );
-
-        console.log(value);
 
     }
 
@@ -80,13 +77,41 @@ export class Interpreter {
         }
 
         if (expression instanceof BinaryExpression) {
-            throw new Error(
-                "Binary expressions are not implemented yet."
-            );
+
+            const left = this.evaluate(expression.left);
+            const right = this.evaluate(expression.right);
+
+            if (
+                typeof left !== "number" ||
+                typeof right !== "number"
+            ) {
+                throw new RuntimeError(
+                    "Arithmetic requires numeric operands.",
+                    0,
+                    0
+                );
+            }
+
+            switch (expression.operator) {
+
+                case "+":
+                    return left + right;
+
+                case "-":
+                    return left - right;
+
+                case "*":
+                    return left * right;
+
+                case "/":
+                    return left / right;
+
+            }
+
         }
 
         throw new Error(
-            `Unknown expression '${expression.kind}'.`
+            "Unknown expression."
         );
 
     }

@@ -1,4 +1,5 @@
 import { Token, TokenType } from "../lexer/Token";
+import { SyntaxError } from "../runtime/Errors";
 import {
     Program,
     Statement,
@@ -7,7 +8,8 @@ import {
     PrintStatement,
     NumberLiteral,
     StringLiteral,
-    Identifier
+    Identifier,
+    BinaryExpression
 } from "../ast/Nodes";
 
 export class Parser {
@@ -38,7 +40,13 @@ export class Parser {
             return this.printStatement();
         }
 
-        throw new Error(`Unexpected token '${this.peek().value}'`);
+        const token = this.peek();
+
+        throw new SyntaxError(
+            `Unexpected token '${token.value}'.`,
+            token.line,
+            token.column
+        );
 
     }
 
@@ -48,9 +56,10 @@ export class Parser {
 
         this.consume(TokenType.Equals);
 
-        const value = this.expression();
-
-        return new LetStatement(name, value);
+        return new LetStatement(
+            name,
+            this.expression()
+        );
 
     }
 
@@ -58,15 +67,69 @@ export class Parser {
 
         this.consume(TokenType.LeftParen);
 
-        const expression = this.expression();
+        const value = this.expression();
 
         this.consume(TokenType.RightParen);
 
-        return new PrintStatement(expression);
+        return new PrintStatement(value);
 
     }
 
     private expression(): Expression {
+        return this.addition();
+    }
+
+    private addition(): Expression {
+
+        let expression = this.multiplication();
+
+        while (
+            this.match(TokenType.Plus) ||
+            this.match(TokenType.Minus)
+        ) {
+
+            const operator = this.previous().value;
+
+            const right = this.multiplication();
+
+            expression = new BinaryExpression(
+                expression,
+                operator,
+                right
+            );
+
+        }
+
+        return expression;
+
+    }
+
+    private multiplication(): Expression {
+
+        let expression = this.primary();
+
+        while (
+            this.match(TokenType.Star) ||
+            this.match(TokenType.Slash)
+        ) {
+
+            const operator = this.previous().value;
+
+            const right = this.primary();
+
+            expression = new BinaryExpression(
+                expression,
+                operator,
+                right
+            );
+
+        }
+
+        return expression;
+
+    }
+
+    private primary(): Expression {
 
         if (this.match(TokenType.Number)) {
             return new NumberLiteral(
@@ -86,7 +149,23 @@ export class Parser {
             );
         }
 
-        throw new Error("Expected expression");
+        if (this.match(TokenType.LeftParen)) {
+
+            const expression = this.expression();
+
+            this.consume(TokenType.RightParen);
+
+            return expression;
+
+        }
+
+        const token = this.peek();
+
+        throw new SyntaxError(
+            "Expected expression.",
+            token.line,
+            token.column
+        );
 
     }
 
@@ -108,8 +187,12 @@ export class Parser {
             return this.tokens[this.current++];
         }
 
-        throw new Error(
-            `Expected ${TokenType[type]}, found ${TokenType[this.peek().type]}`
+        const token = this.peek();
+
+        throw new SyntaxError(
+            `Expected ${TokenType[type]}.`,
+            token.line,
+            token.column
         );
 
     }

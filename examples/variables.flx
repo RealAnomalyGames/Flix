@@ -1,9 +1,7 @@
 // Variables
 
 let nam = "Flix"
-
 let ver = 1
-
 let aut = "John Doe"
 
 prt(nam)

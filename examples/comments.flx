@@ -1,0 +1,8 @@
+// Everything beginning with //
+// should be ignored by the lexer.
+
+let num = 100
+
+// Print the value.
+
+prt(num)
