@@ -1,9 +1,9 @@
 import * as fs from "fs";
 
-import { Lexer } from "./lexer/Lexer";
-import { Parser } from "./parser/Parser";
-import { Interpreter } from "./interpreter/Interpreter";
-import { FlixError } from "./runtime/Errors";
+import { Lexer } from "../../core/src/lexer/Lexer";
+import { Parser } from "../../core/src/parser/Parser";
+import { Interpreter } from "../../interpreter/src/Interpreter";
+import { FlixError } from "../../core/src/runtime/Errors";
 
 const args = process.argv.slice(2);
 

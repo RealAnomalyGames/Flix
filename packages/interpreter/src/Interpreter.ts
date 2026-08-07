@@ -8,10 +8,10 @@ import {
     StringLiteral,
     Identifier,
     BinaryExpression
-} from "../ast/Nodes";
+} from "../../core/src/ast/Nodes";
 
-import { RuntimeError } from "../runtime/Errors";
-import { Environment } from "../runtime/Environment";
+import { Environment } from "../../core/src/runtime/Environment";
+import { RuntimeError } from "../../core/src/runtime/Errors";
 
 export class Interpreter {
 

@@ -1,5 +1,5 @@
 import { Token, TokenType } from "../lexer/Token";
-import { SyntaxError } from "../runtime/Errors";
+
 import {
     Program,
     Statement,
@@ -11,6 +11,8 @@ import {
     Identifier,
     BinaryExpression
 } from "../ast/Nodes";
+
+import { SyntaxError } from "../runtime/Errors";
 
 export class Parser {
 

@@ -1,26 +1,14 @@
 {
-  "name": "flix",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "build": "tsc",
-    "start": "node dist/main.js"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/RealAnomalyGames/Flix.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/RealAnomalyGames/Flix/issues"
-  },
-  "homepage": "https://github.com/RealAnomalyGames/Flix#readme",
-  "devDependencies": {
-    "@types/node": "^26.1.2",
-    "typescript": "^7.0.2"
-  }
+    "name": "flix",
+    "version": "0.02.0",
+    "description": "Flix programming language for games and software.",
+    "main": "dist/packages/cli/src/Main.js",
+    "scripts": {
+        "build": "tsc",
+        "start": "node dist/packages/cli/src/main.js"
+    },
+    "devDependencies": {
+        "@types/node": "^24.0.0",
+        "typescript": "^5.0.0"
+    }
 }
