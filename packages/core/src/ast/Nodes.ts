@@ -59,6 +59,24 @@ export class StringLiteral extends Expression {
 
 }
 
+export class BooleanLiteral extends Expression {
+
+    constructor(
+        public readonly value: boolean
+    ) {
+        super("BooleanLiteral");
+    }
+
+}
+
+export class NilLiteral extends Expression {
+
+    constructor() {
+        super("NilLiteral");
+    }
+
+}
+
 export class Identifier extends Expression {
 
     constructor(

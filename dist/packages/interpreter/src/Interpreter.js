@@ -20,14 +20,19 @@ class Interpreter {
             this.executePrint(statement);
             return;
         }
-        throw new Error("Unknown statement.");
+        throw new Errors_1.RuntimeError(`Unknown statement '${statement.kind}'.`, 0, 0);
     }
     executeLet(statement) {
         const value = this.evaluate(statement.value);
         this.environment.define(statement.name, value);
     }
     executePrint(statement) {
-        console.log(this.evaluate(statement.expression));
+        const value = this.evaluate(statement.expression);
+        if (value === null) {
+            console.log("nil");
+            return;
+        }
+        console.log(value);
     }
     evaluate(expression) {
         if (expression instanceof Nodes_1.NumberLiteral) {
@@ -35,6 +40,12 @@ class Interpreter {
         }
         if (expression instanceof Nodes_1.StringLiteral) {
             return expression.value;
+        }
+        if (expression instanceof Nodes_1.BooleanLiteral) {
+            return expression.value;
+        }
+        if (expression instanceof Nodes_1.NilLiteral) {
+            return null;
         }
         if (expression instanceof Nodes_1.Identifier) {
             return this.environment.get(expression.name);
@@ -57,7 +68,7 @@ class Interpreter {
                     return left / right;
             }
         }
-        throw new Error("Unknown expression.");
+        throw new Errors_1.RuntimeError(`Unknown expression '${expression.kind}'.`, 0, 0);
     }
 }
 exports.Interpreter = Interpreter;

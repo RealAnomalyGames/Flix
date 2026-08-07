@@ -68,6 +68,15 @@ class Parser {
         if (this.match(Token_1.TokenType.String)) {
             return new Nodes_1.StringLiteral(this.previous().value);
         }
+        if (this.match(Token_1.TokenType.True)) {
+            return new Nodes_1.BooleanLiteral(true);
+        }
+        if (this.match(Token_1.TokenType.False)) {
+            return new Nodes_1.BooleanLiteral(false);
+        }
+        if (this.match(Token_1.TokenType.Nil)) {
+            return new Nodes_1.NilLiteral();
+        }
         if (this.match(Token_1.TokenType.Identifier)) {
             return new Nodes_1.Identifier(this.previous().value);
         }

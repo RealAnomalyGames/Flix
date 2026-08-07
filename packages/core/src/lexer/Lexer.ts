@@ -149,6 +149,15 @@ export class Lexer {
             case "prt":
                 return new Token(TokenType.Prt, value, line, column);
 
+            case "true":
+                return new Token(TokenType.True, value, line, column);
+
+            case "false":
+                return new Token(TokenType.False, value, line, column);
+
+            case "nil":
+                return new Token(TokenType.Nil, value, line, column);
+
             default:
                 return new Token(TokenType.Identifier, value, line, column);
 

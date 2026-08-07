@@ -6,6 +6,8 @@ import {
     PrintStatement,
     NumberLiteral,
     StringLiteral,
+    BooleanLiteral,
+    NilLiteral,
     Identifier,
     BinaryExpression
 } from "../../core/src/ast/Nodes";
@@ -37,13 +39,19 @@ export class Interpreter {
             return;
         }
 
-        throw new Error("Unknown statement.");
+        throw new RuntimeError(
+            `Unknown statement '${statement.kind}'.`,
+            0,
+            0
+        );
 
     }
 
     private executeLet(statement: LetStatement): void {
 
-        const value = this.evaluate(statement.value);
+        const value = this.evaluate(
+            statement.value
+        );
 
         this.environment.define(
             statement.name,
@@ -54,9 +62,16 @@ export class Interpreter {
 
     private executePrint(statement: PrintStatement): void {
 
-        console.log(
-            this.evaluate(statement.expression)
+        const value = this.evaluate(
+            statement.expression
         );
+
+        if (value === null) {
+            console.log("nil");
+            return;
+        }
+
+        console.log(value);
 
     }
 
@@ -70,26 +85,43 @@ export class Interpreter {
             return expression.value;
         }
 
+        if (expression instanceof BooleanLiteral) {
+            return expression.value;
+        }
+
+        if (expression instanceof NilLiteral) {
+            return null;
+        }
+
         if (expression instanceof Identifier) {
+
             return this.environment.get(
                 expression.name
             );
+
         }
 
         if (expression instanceof BinaryExpression) {
 
-            const left = this.evaluate(expression.left);
-            const right = this.evaluate(expression.right);
+            const left = this.evaluate(
+                expression.left
+            );
+
+            const right = this.evaluate(
+                expression.right
+            );
 
             if (
                 typeof left !== "number" ||
                 typeof right !== "number"
             ) {
+
                 throw new RuntimeError(
                     "Arithmetic requires numeric operands.",
                     0,
                     0
                 );
+
             }
 
             switch (expression.operator) {
@@ -110,8 +142,10 @@ export class Interpreter {
 
         }
 
-        throw new Error(
-            "Unknown expression."
+        throw new RuntimeError(
+            `Unknown expression '${expression.kind}'.`,
+            0,
+            0
         );
 
     }

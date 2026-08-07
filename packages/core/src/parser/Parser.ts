@@ -8,6 +8,8 @@ import {
     PrintStatement,
     NumberLiteral,
     StringLiteral,
+    BooleanLiteral,
+    NilLiteral,
     Identifier,
     BinaryExpression
 } from "../ast/Nodes";
@@ -54,7 +56,9 @@ export class Parser {
 
     private letStatement(): LetStatement {
 
-        const name = this.consume(TokenType.Identifier).value;
+        const name = this.consume(
+            TokenType.Identifier
+        ).value;
 
         this.consume(TokenType.Equals);
 
@@ -134,21 +138,45 @@ export class Parser {
     private primary(): Expression {
 
         if (this.match(TokenType.Number)) {
+
             return new NumberLiteral(
                 Number(this.previous().value)
             );
+
         }
 
         if (this.match(TokenType.String)) {
+
             return new StringLiteral(
                 this.previous().value
             );
+
+        }
+
+        if (this.match(TokenType.True)) {
+
+            return new BooleanLiteral(true);
+
+        }
+
+        if (this.match(TokenType.False)) {
+
+            return new BooleanLiteral(false);
+
+        }
+
+        if (this.match(TokenType.Nil)) {
+
+            return new NilLiteral();
+
         }
 
         if (this.match(TokenType.Identifier)) {
+
             return new Identifier(
                 this.previous().value
             );
+
         }
 
         if (this.match(TokenType.LeftParen)) {

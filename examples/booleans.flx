@@ -1,0 +1,7 @@
+// Boolean values
+
+let yes = true
+let no = false
+
+prt(yes)
+prt(no)

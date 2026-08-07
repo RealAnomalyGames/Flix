@@ -1,46 +1,44 @@
 export enum TokenType {
 
-    // Special
-    EOF,
-
     // Literals
     Identifier,
     Number,
     String,
+    True,
+    False,
+    Nil,
 
     // Keywords
     Let,
     Prt,
 
     // Operators
-    Equals,
     Plus,
     Minus,
     Star,
     Slash,
+    Equals,
 
-    // Symbols
+    // Delimiters
     LeftParen,
     RightParen,
     Comma,
 
+    // Special
+    EOF,
+    
     // Unknown
     Unknown
+
 }
 
 export class Token {
 
     constructor(
-        public type: TokenType,
-        public value: string,
-        public line: number,
-        public column: number
+        public readonly type: TokenType,
+        public readonly value: string,
+        public readonly line: number,
+        public readonly column: number
     ) {}
-
-    public toString(): string {
-
-        return `${TokenType[this.type]}("${this.value}") @ ${this.line}:${this.column}`;
-
-    }
 
 }

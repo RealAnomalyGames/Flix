@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Program = exports.BinaryExpression = exports.Identifier = exports.StringLiteral = exports.NumberLiteral = exports.Expression = exports.PrintStatement = exports.LetStatement = exports.Statement = exports.Node = void 0;
+exports.Program = exports.BinaryExpression = exports.Identifier = exports.NilLiteral = exports.BooleanLiteral = exports.StringLiteral = exports.NumberLiteral = exports.Expression = exports.PrintStatement = exports.LetStatement = exports.Statement = exports.Node = void 0;
 class Node {
     kind;
     constructor(kind) {
@@ -54,6 +54,20 @@ class StringLiteral extends Expression {
     }
 }
 exports.StringLiteral = StringLiteral;
+class BooleanLiteral extends Expression {
+    value;
+    constructor(value) {
+        super("BooleanLiteral");
+        this.value = value;
+    }
+}
+exports.BooleanLiteral = BooleanLiteral;
+class NilLiteral extends Expression {
+    constructor() {
+        super("NilLiteral");
+    }
+}
+exports.NilLiteral = NilLiteral;
 class Identifier extends Expression {
     name;
     constructor(name) {

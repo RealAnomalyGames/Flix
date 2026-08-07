@@ -90,6 +90,12 @@ class Lexer {
                 return new Token_1.Token(Token_1.TokenType.Let, value, line, column);
             case "prt":
                 return new Token_1.Token(Token_1.TokenType.Prt, value, line, column);
+            case "true":
+                return new Token_1.Token(Token_1.TokenType.True, value, line, column);
+            case "false":
+                return new Token_1.Token(Token_1.TokenType.False, value, line, column);
+            case "nil":
+                return new Token_1.Token(Token_1.TokenType.Nil, value, line, column);
             default:
                 return new Token_1.Token(Token_1.TokenType.Identifier, value, line, column);
         }

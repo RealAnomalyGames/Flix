@@ -1,0 +1,6 @@
+// Nil value
+
+let nothing = nil
+
+prt(nothing)
+prt(nil)
