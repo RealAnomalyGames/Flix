@@ -1,0 +1,8 @@
+.start:
+    var score:int = 999999999999999999999999999999999999999999999999
+    var distance:float = 123456789012345678901234567890.123456789
+
+    outln score
+    outln distance
+
+    halt 0
