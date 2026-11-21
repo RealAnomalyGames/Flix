@@ -3,6 +3,7 @@
 #include <string>
 
 #include "flix/version.hpp"
+#include "flix/program.hpp"
 
 int main(int argc, char* argv[]) {
 
@@ -10,8 +11,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Flix Compiler "
                   << flix::version() << "\n";
 
-        std::cout << "Usage: flixc build <file.flix>\n";
-        std::cout << "       flixc asm <file.flix>\n";
+        std::cout << "Usage: flixc check <file.flix>\n";
         std::cout << "       flixc version\n";
 
         return 0;
@@ -26,22 +26,23 @@ int main(int argc, char* argv[]) {
         return 0;
     }
 
-    if (command == "build" || command == "asm") {
-        if (argc < 3) {
-            std::cerr << "Error: Missing Flix source file.\n";
-            return 1;
-        }
-
-        std::cout << "Flix compiler initialized.\n";
-        std::cout << "Mode: " << command << "\n";
-        std::cout << "Source: " << argv[2] << "\n";
-
-        // Native compilation and assembly generation
-        // will be implemented in later development steps.
-
-        return 0;
+    if (command != "check" || argc < 3) {
+        std::cerr << "Usage: flixc check <file.flix>\n";
+        return 1;
     }
 
-    std::cerr << "Unknown command: " << command << "\n";
-    return 1;
+    flix::Program program;
+    std::string error;
+
+    if (!flix::loadProgram(argv[2], program, error)) {
+        std::cerr << "Flix Error: " << error << "\n";
+        return 1;
+    }
+
+    std::cout << "Flix program structure is valid.\n";
+    std::cout << "Labels: " << program.labels.size() << "\n";
+    std::cout << "Instructions: "
+              << program.instructions.size() << "\n";
+
+    return 0;
 }
