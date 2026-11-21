@@ -1,28 +1,21 @@
-
 #include <iostream>
 #include <string>
 
-#include "flix/version.hpp"
 #include "flix/program.hpp"
+#include "flix/version.hpp"
 
 int main(int argc, char* argv[]) {
-
     if (argc < 2) {
-        std::cout << "Flix Compiler "
-                  << flix::version() << "\n";
-
+        std::cout << "Flix Compiler\n";
         std::cout << "Usage: flixc check <file.flix>\n";
         std::cout << "       flixc version\n";
-
         return 0;
     }
 
-    std::string command = argv[1];
+    const std::string command = argv[1];
 
     if (command == "version") {
-        std::cout << "Flix Compiler "
-                  << flix::version() << "\n";
-
+        std::cout << "Flix Compiler " << FLIX_VERSION << "\n";
         return 0;
     }
 
@@ -41,8 +34,8 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Flix program structure is valid.\n";
     std::cout << "Labels: " << program.labels.size() << "\n";
-    std::cout << "Instructions: "
-              << program.instructions.size() << "\n";
+    std::cout << "Variables: " << program.variables.size() << "\n";
+    std::cout << "Instructions: " << program.instructions.size() << "\n";
 
     return 0;
 }
