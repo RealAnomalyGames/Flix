@@ -1,3 +1,4 @@
+
 cmake_minimum_required(VERSION 3.20)
 
 project(Flix
@@ -10,16 +11,37 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(flix
-    src/main.cpp
-    src/lexer/lexer.cpp
-    src/parser/parser.cpp
+# Interpreter
+add_executable(flix-interpreter
+    src/interpreter/main.cpp
 )
 
-target_include_directories(flix PRIVATE src)
+# Compiler
+add_executable(flix-compiler
+    src/compiler/main.cpp
+)
 
-if(MSVC)
-    target_compile_options(flix PRIVATE /W4 /permissive-)
-else()
-    target_compile_options(flix PRIVATE -Wall -Wextra -Wpedantic)
+# Include directories
+target_include_directories(flix-interpreter PRIVATE include)
+target_include_directories(flix-compiler PRIVATE include)
+
+# Windows executable settings
+if(WIN32)
+    set_target_properties(
+        flix-interpreter
+        flix-compiler
+        PROPERTIES
+        WIN32_EXECUTABLE FALSE
+    )
 endif()
+
+# Release output directory
+set_target_properties(
+    flix-interpreter
+    flix-compiler
+    PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
+
+message(STATUS "Flix version: ${PROJECT_VERSION}")
+message(STATUS "Target architecture: x86_64 (initial target)")
