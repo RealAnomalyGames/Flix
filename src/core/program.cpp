@@ -475,7 +475,7 @@ bool parseProgram(
             "out", "outln", "mov",
             "add", "sub", "mul", "div", "mod",
             "inc", "dec", "neg",
-            "cmp", "jmp", "halt"
+            "cmp", "el", "jmp", "halt"
         };
 
         if (!known.contains(opcode)) {
