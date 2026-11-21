@@ -249,11 +249,11 @@ bool parseVariable(
 
 bool isBranchMarker(const Instruction& instruction) {
     return instruction.opcode == "cmp" ||
-           instruction.opcode == "el";
+           instruction.opcode == ;
 }
 
 bool isConditionalElse(const Instruction& instruction) {
-    return instruction.opcode == "el" &&
+    return instruction.opcode ==  &&
            instruction.operand.rfind("cmp ", 0) == 0;
 }
 
@@ -465,7 +465,7 @@ bool parseProgram(
             operand = trim(line.substr(separator + 1));
         }
 
-        if (opcode == "el" &&
+        if (opcode ==  &&
             operand.rfind("cmp ", 0) == 0) {
             // Keep the "cmp " prefix so the backend can
             // distinguish else-if from unconditional else.
@@ -475,7 +475,7 @@ bool parseProgram(
             "out", "outln", "mov",
             "add", "sub", "mul", "div", "mod",
             "inc", "dec", "neg",
-            "cmp", "el", "jmp", "halt"
+            "cmp", "jmp", "halt"
         };
 
         if (!known.contains(opcode)) {
