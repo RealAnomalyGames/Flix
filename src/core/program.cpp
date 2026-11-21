@@ -18,7 +18,7 @@ static std::string trim(const std::string& value) {
 
     const auto last = value.find_last_not_of(" \t\r\n");
 
-    return value.substr(0, last - first + 1);
+    return value.substr(first, last - first + 1);
 }
 
 static std::string removeComment(const std::string& line) {
@@ -288,7 +288,7 @@ bool parseProgram(
     while (std::getline(input, line)) {
         ++lineNumber;
 
-        line = trim(removeComment(line));
+        line = (removeComment(line));
 
         if (line.empty())
             continue;
