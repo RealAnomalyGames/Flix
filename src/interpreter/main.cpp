@@ -569,6 +569,7 @@ int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cout << "Flix Interpreter\n";
         std::cout << "Usage: flix run <file.flix>\n";
+        std::cout << "Usage: flix version\n";
         std::cout << "       flix \n";
         return 0;
     }
@@ -576,6 +577,11 @@ int main(int argc, char* argv[]) {
     const std::string command = argv[1];
 
     if (command == "") {
+        std::cout << "Flix " << flix::version() << "\n";
+        return 0;
+    }
+
+    if (argc == 2 && std::string(argv[1]) == "version") {
         std::cout << "Flix " << flix::version() << "\n";
         return 0;
     }
