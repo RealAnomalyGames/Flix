@@ -569,14 +569,14 @@ int main(int argc, char* argv[]) {
     if (argc < 2) {
         std::cout << "Flix Interpreter\n";
         std::cout << "Usage: flix run <file.flix>\n";
-        std::cout << "       flix version\n";
+        std::cout << "       flix \n";
         return 0;
     }
 
     const std::string command = argv[1];
 
-    if (command == "version") {
-        std::cout << "Flix " << FLIX_VERSION << "\n";
+    if (command == "") {
+        std::cout << "Flix " << flix::version() << "\n";
         return 0;
     }
 
