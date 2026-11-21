@@ -126,6 +126,17 @@ static int runtimeError(
     return 1;
 }
 
+static std::string trim(const std::string& value) {
+    const auto first = value.find_first_not_of(" \t\r\n");
+
+    if (first == std::string::npos)
+        return "";
+
+    const auto last = value.find_last_not_of(" \t\r\n");
+
+    return value.substr(first, last - first + 1);
+}
+
 int main(int argc, char* argv[]) {
 
     if (argc < 2) {
@@ -216,11 +227,13 @@ int main(int argc, char* argv[]) {
         else if (instruction.opcode == "mov") {
             size_t comma = instruction.operand.find(',');
 
-            std::string destination =
-                instruction.operand.substr(0, comma);
+            std::string destination = trim(
+                instruction.operand.substr(0, comma)
+            );
 
-            std::string source =
-                instruction.operand.substr(comma + 1);
+            std::string source = trim(
+                instruction.operand.substr(comma + 1)
+            );
 
             auto target = variables.find(destination);
 
