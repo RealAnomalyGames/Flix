@@ -10,6 +10,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 namespace fs = std::filesystem;
 
