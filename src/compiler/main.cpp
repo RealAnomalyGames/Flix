@@ -527,7 +527,7 @@ bool writeGeneratedSource(
                  << ";\n";
         }
 
-        else if (op == "cmp" || op == ) {
+        else if (op == "cmp" || op == "el") {
             if (instruction.branch_id < 0) {
                 std::cerr << "Line " << instruction.line
                           << ": Invalid conditional branch metadata.\n";
