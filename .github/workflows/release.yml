@@ -37,6 +37,23 @@ jobs:
           if (!(Test-Path dist/flixc.exe)) {
               throw "Flix compiler was not generated."
           }
+      
+      - name: Generate Flix Library
+        shell: pwsh
+        run: |
+          ./tools/New-Flib.ps1 -OutputPath dist/flix.flib
+
+          if (!(Test-Path dist/flix.flib)) {
+              throw "Flix library was not generated."
+          }
+
+          $bytes = [System.IO.File]::ReadAllBytes("dist/flix.flib")
+
+          if ([System.Text.Encoding]::ASCII.GetString($bytes[0..3]) -ne "FLIB") {
+              throw "Invalid FLIB signature."
+          }
+
+          Write-Host "Flix library validated successfully."
 
       - name: Publish GitHub Release
         env:
