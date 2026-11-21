@@ -172,48 +172,50 @@ std::string valueTypeName(ValueType type) {
     return "unknown";
 }
 
+
 static bool parseVariable(
     const std::string& operand,
     int line,
     Program& program,
     std::string& error
 ) {
-    size_t colon = operand.find(':');
+    const size_t colon = operand.find(':');
 
     if (colon == std::string::npos) {
         error = "Line " + std::to_string(line) +
                 ": Variable declaration requires a type.";
-
         return false;
     }
 
-    std::string name = trim(operand.substr(0, colon));
-    std::string remainder = trim(operand.substr(colon + 1));
+    // Extract the variable name before the colon.
+    const std::string name = trim(operand.substr(0, colon));
+
+    // Extract everything after the colon.
+    const std::string remainder = trim(operand.substr(colon + 1));
 
     if (!validIdentifier(name)) {
         error = "Line " + std::to_string(line) +
                 ": Invalid variable name '" + name + "'.";
-
         return false;
     }
 
     if (program.variables.count(name)) {
         error = "Line " + std::to_string(line) +
                 ": Duplicate variable '" + name + "'.";
-
         return false;
     }
 
-    size_t equals = remainder.find('=');
+    const size_t equals = remainder.find('=');
 
-    std::string typeName = trim(
+    const std::string typeName = trim(
         remainder.substr(0, equals)
     );
 
     std::string initialValue;
 
-    if (equals != std::string::npos)
+    if (equals != std::string::npos) {
         initialValue = trim(remainder.substr(equals + 1));
+    }
 
     ValueType type;
 
@@ -228,17 +230,14 @@ static bool parseVariable(
     else {
         error = "Line " + std::to_string(line) +
                 ": Unknown variable type '" + typeName + "'.";
-
         return false;
     }
 
     if (equals != std::string::npos &&
         !validValue(type, initialValue)) {
-
         error = "Line " + std::to_string(line) +
                 ": Invalid initial value for variable '" +
                 name + "'.";
-
         return false;
     }
 
