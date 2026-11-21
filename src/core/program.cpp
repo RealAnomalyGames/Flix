@@ -463,6 +463,68 @@ bool parseProgram(
         }
     }
 
+    
+    // Validate variable references and assignments.
+
+    for (const auto& instruction : program.instructions) {
+
+        if (instruction.opcode == "outln") {
+            const std::string& operand = instruction.operand;
+
+            if (operand.front() != '"' &&
+                !program.variables.count(operand)) {
+
+                error = "Line " +
+                    std::to_string(instruction.line) +
+                    ": Undefined variable '" + operand + "'.";
+
+                return false;
+            }
+        }
+
+        if (instruction.opcode == "mov") {
+            size_t comma = findSeparator(instruction.operand);
+
+            std::string destination = trim(
+                instruction.operand.substr(0, comma)
+            );
+
+            std::string source = trim(
+                instruction.operand.substr(comma + 1)
+            );
+
+            auto target = program.variables.find(destination);
+
+            if (target == program.variables.end()) {
+                error = "Line " +
+                    std::to_string(instruction.line) +
+                    ": Undefined variable '" + destination + "'.";
+
+                return false;
+            }
+
+            auto sourceVariable = program.variables.find(source);
+
+            if (sourceVariable != program.variables.end()) {
+                if (sourceVariable->second.type != target->second.type) {
+                    error = "Line " +
+                        std::to_string(instruction.line) +
+                        ": Variable type mismatch.";
+
+                    return false;
+                }
+            }
+            else if (!validValue(target->second.type, source)) {
+                error = "Line " +
+                    std::to_string(instruction.line) +
+                    ": Invalid value for variable '" +
+                    destination + "'.";
+
+                return false;
+            }
+        }
+    }
+
     return true;
 }
 
