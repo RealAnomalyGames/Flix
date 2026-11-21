@@ -4,26 +4,24 @@
 #include <cctype>
 #include <fstream>
 #include <sstream>
-#include <string>
-#include <vector>
 
 namespace flix {
 
-static std::string trim(const std::string& value) {
-    const auto first = value.find_first_not_of(" \t\r\n");
+static std::string trim(const std::string& s) {
+    const auto first = s.find_first_not_of(" \t\r\n");
 
     if (first == std::string::npos)
         return "";
 
-    const auto last = value.find_last_not_of(" \t\r\n");
+    const auto last = s.find_last_not_of(" \t\r\n");
 
-    return value.substr(first, last - first + 1);
+    return s.substr(first, last - first + 1);
 }
 
-static int indentationOf(const std::string& line) {
+static int indentationOf(const std::string& s) {
     int result = 0;
 
-    for (char c : line) {
+    for (char c : s) {
         if (c == ' ')
             ++result;
         else if (c == '\t')
@@ -35,97 +33,93 @@ static int indentationOf(const std::string& line) {
     return result;
 }
 
-static std::string removeComment(const std::string& line) {
-    bool inString = false;
+static std::string removeComment(const std::string& s) {
+    bool quoted = false;
     bool escaped = false;
 
-    for (std::size_t i = 0; i < line.size(); ++i) {
-        const char c = line[i];
+    for (std::size_t i = 0; i < s.size(); ++i) {
+        char c = s[i];
 
         if (escaped) {
             escaped = false;
             continue;
         }
 
-        if (inString && c == '\\') {
+        if (quoted && c == '\\') {
             escaped = true;
             continue;
         }
 
         if (c == '"')
-            inString = !inString;
+            quoted = !quoted;
 
-        if (c == ';' && !inString)
-            return line.substr(0, i);
+        if (c == ';' && !quoted)
+            return s.substr(0, i);
     }
 
-    return line;
+    return s;
 }
 
-static bool validIdentifier(const std::string& value) {
-    if (value.empty())
+static bool identifier(const std::string& s) {
+    if (s.empty())
         return false;
 
-    if (!std::isalpha(static_cast<unsigned char>(value[0])) &&
-        value[0] != '_')
+    if (!(std::isalpha(static_cast<unsigned char>(s[0])) ||
+          s[0] == '_'))
         return false;
 
-    for (char c : value) {
-        if (!std::isalnum(static_cast<unsigned char>(c)) &&
-            c != '_')
+    for (char c : s) {
+        if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_'))
             return false;
     }
 
     return true;
 }
 
-static bool validLabel(const std::string& value) {
-    return value.size() > 1 &&
-           value[0] == '.' &&
-           validIdentifier(value.substr(1));
+static bool labelName(const std::string& s) {
+    return s.size() > 1 && s[0] == '.' &&
+           identifier(s.substr(1));
 }
 
-static bool validInteger(const std::string& value) {
-    if (value.empty())
+static bool integerLiteral(const std::string& s) {
+    if (s.empty())
         return false;
 
     std::size_t i = 0;
 
-    if (value[0] == '-' || value[0] == '+')
+    if (s[i] == '+' || s[i] == '-')
         ++i;
 
-    if (i == value.size())
+    if (i == s.size())
         return false;
 
-    for (; i < value.size(); ++i) {
-        if (!std::isdigit(static_cast<unsigned char>(value[i])))
+    for (; i < s.size(); ++i) {
+        if (!std::isdigit(static_cast<unsigned char>(s[i])))
             return false;
     }
 
     return true;
 }
 
-static bool validFloat(const std::string& value) {
-    if (value.empty())
+static bool floatLiteral(const std::string& s) {
+    if (s.empty())
         return false;
 
     std::size_t i = 0;
 
-    if (value[0] == '-' || value[0] == '+')
+    if (s[i] == '+' || s[i] == '-')
         ++i;
 
     bool dot = false;
     bool digit = false;
 
-    for (; i < value.size(); ++i) {
-        const char c = value[i];
-
-        if (c == '.' && !dot) {
+    for (; i < s.size(); ++i) {
+        if (s[i] == '.' && !dot) {
             dot = true;
             continue;
         }
 
-        if (!std::isdigit(static_cast<unsigned char>(c)))
+        if (!std::isdigit(static_cast<unsigned char>(s[i])))
             return false;
 
         digit = true;
@@ -134,58 +128,51 @@ static bool validFloat(const std::string& value) {
     return dot && digit;
 }
 
-static bool validString(const std::string& value) {
-    if (value.size() < 2 ||
-        value.front() != '"' ||
-        value.back() != '"')
+static bool stringLiteral(const std::string& s) {
+    if (s.size() < 2 || s.front() != '"' || s.back() != '"')
         return false;
 
     bool escaped = false;
 
-    for (std::size_t i = 1; i + 1 < value.size(); ++i) {
-        const char c = value[i];
+    for (std::size_t i = 1; i + 1 < s.size(); ++i) {
+        char c = s[i];
 
         if (escaped) {
-            if (c != 'n' && c != 't' &&
-                c != '"' && c != '\\')
+            if (c != 'n' && c != 't' && c != '"' && c != '\\')
                 return false;
 
             escaped = false;
-            continue;
-        }
-
-        if (c == '\\') {
+        } else if (c == '\\') {
             escaped = true;
-            continue;
-        }
-
-        if (c == '"')
+        } else if (c == '"') {
             return false;
+        }
     }
 
     return !escaped;
 }
 
-static bool parseType(
-    const std::string& name,
-    ValueType& type
-) {
-    if (name == "int") {
+static bool booleanLiteral(const std::string& s) {
+    return s == "true" || s == "false";
+}
+
+static bool parseType(const std::string& s, ValueType& type) {
+    if (s == "int") {
         type = ValueType::Integer;
         return true;
     }
 
-    if (name == "float") {
+    if (s == "float") {
         type = ValueType::Float;
         return true;
     }
 
-    if (name == "str") {
+    if (s == "str") {
         type = ValueType::String;
         return true;
     }
 
-    if (name == "bool") {
+    if (s == "bool") {
         type = ValueType::Boolean;
         return true;
     }
@@ -204,25 +191,34 @@ std::string valueTypeName(ValueType type) {
     return "unknown";
 }
 
-static bool validValue(
-    const std::string& value,
-    ValueType type
+static std::size_t findOutsideString(
+    const std::string& s,
+    const std::string& target
 ) {
-    switch (type) {
-        case ValueType::Integer:
-            return validInteger(value);
+    bool quoted = false;
+    bool escaped = false;
 
-        case ValueType::Float:
-            return validFloat(value);
+    for (std::size_t i = 0; i + target.size() <= s.size(); ++i) {
+        char c = s[i];
 
-        case ValueType::String:
-            return validString(value);
+        if (escaped) {
+            escaped = false;
+            continue;
+        }
 
-        case ValueType::Boolean:
-            return value == "true" || value == "false";
+        if (quoted && c == '\\') {
+            escaped = true;
+            continue;
+        }
+
+        if (c == '"')
+            quoted = !quoted;
+
+        if (!quoted && s.compare(i, target.size(), target) == 0)
+            return i;
     }
 
-    return false;
+    return std::string::npos;
 }
 
 static bool parseVariable(
@@ -239,13 +235,10 @@ static bool parseVariable(
         return false;
     }
 
-    const std::string name =
-        trim(operand.substr(0, colon));
+    const std::string name = trim(operand.substr(0, colon));
+    const std::string rest = trim(operand.substr(colon + 1));
 
-    const std::string remainder =
-        trim(operand.substr(colon + 1));
-
-    if (!validIdentifier(name)) {
+    if (!identifier(name)) {
         error = "Line " + std::to_string(line) +
                 ": Invalid variable name '" + name + "'.";
         return false;
@@ -257,121 +250,69 @@ static bool parseVariable(
         return false;
     }
 
-    const auto equals = remainder.find('=');
+    const auto equals = rest.find('=');
 
-    const std::string typeName =
-        trim(remainder.substr(0, equals));
+    const std::string typeText = trim(rest.substr(0, equals));
 
     ValueType type;
 
-    if (!parseType(typeName, type)) {
+    if (!parseType(typeText, type)) {
         error = "Line " + std::to_string(line) +
-                ": Unknown variable type '" + typeName + "'.";
+                ": Unknown type '" + typeText + "'.";
         return false;
     }
 
-    std::string initialValue;
+    std::string initial;
 
-    if (equals == std::string::npos) {
-        switch (type) {
-            case ValueType::Integer: initialValue = "0"; break;
-            case ValueType::Float: initialValue = "0.0"; break;
-            case ValueType::String: initialValue = "\"\""; break;
-            case ValueType::Boolean: initialValue = "false"; break;
-        }
+    if (equals != std::string::npos) {
+        initial = trim(rest.substr(equals + 1));
     } else {
-        initialValue = trim(remainder.substr(equals + 1));
+        switch (type) {
+            case ValueType::Integer: initial = "0"; break;
+            case ValueType::Float: initial = "0.0"; break;
+            case ValueType::String: initial = "\"\""; break;
+            case ValueType::Boolean: initial = "false"; break;
+        }
     }
 
-    if (!validValue(initialValue, type)) {
+    bool valid = false;
+
+    switch (type) {
+        case ValueType::Integer: valid = integerLiteral(initial); break;
+        case ValueType::Float: valid = floatLiteral(initial); break;
+        case ValueType::String: valid = stringLiteral(initial); break;
+        case ValueType::Boolean: valid = booleanLiteral(initial); break;
+    }
+
+    if (!valid) {
         error = "Line " + std::to_string(line) +
-                ": Initial value does not match type '" +
-                typeName + "'.";
+                ": Initial value does not match type '" + typeText + "'.";
         return false;
     }
 
     program.variables.emplace(
         name,
-        Variable{name, type, initialValue, line}
+        Variable{name, type, initial, line}
     );
 
     return true;
 }
 
-static bool isOpcode(const std::string& opcode) {
-    static const std::vector<std::string> opcodes = {
-        "mov", "out", "outln",
-        "jmp", "halt",
+static bool knownOpcode(const std::string& op) {
+    static const std::vector<std::string> names = {
+        "mov", "out", "outln", "jmp", "halt",
         "add", "sub", "mul", "div", "mod",
-        "inc", "dec", "neg",
-        "cmp", "el"
+        "inc", "dec", "neg", "cmp", "el"
     };
 
-    return std::find(
-        opcodes.begin(),
-        opcodes.end(),
-        opcode
-    ) != opcodes.end();
+    return std::find(names.begin(), names.end(), op) != names.end();
 }
 
-static bool isArithmetic(const std::string& opcode) {
-    return opcode == "add" ||
-           opcode == "sub" ||
-           opcode == "mul" ||
-           opcode == "div" ||
-           opcode == "mod" ||
-           opcode == "inc" ||
-           opcode == "dec" ||
-           opcode == "neg";
-}
-
-static bool isLogicalContinuation(const std::string& line) {
-    return line.rfind("&& ", 0) == 0 ||
-           line.rfind("|| ", 0) == 0 ||
-           line.rfind("^^ ", 0) == 0;
-}
-
-static bool findComparisonOperator(
-    const std::string& expression,
-    std::size_t& position,
-    std::string& operation
-) {
-    static const std::vector<std::string> operators = {
-        "==", "!=", ">=", "<=", ">", "<"
-    };
-
-    bool inString = false;
-    bool escaped = false;
-
-    for (std::size_t i = 0; i < expression.size(); ++i) {
-        const char c = expression[i];
-
-        if (escaped) {
-            escaped = false;
-            continue;
-        }
-
-        if (inString && c == '\\') {
-            escaped = true;
-            continue;
-        }
-
-        if (c == '"')
-            inString = !inString;
-
-        if (inString)
-            continue;
-
-        for (const auto& op : operators) {
-            if (expression.compare(i, op.size(), op) == 0) {
-                position = i;
-                operation = op;
-                return true;
-            }
-        }
-    }
-
-    return false;
+static bool arithmeticOpcode(const std::string& op) {
+    return op == "add" || op == "sub" ||
+           op == "mul" || op == "div" ||
+           op == "mod" || op == "inc" ||
+           op == "dec" || op == "neg";
 }
 
 bool parseProgram(
@@ -383,85 +324,49 @@ bool parseProgram(
     error.clear();
 
     std::istringstream input(source);
-    std::string rawLine;
-
+    std::string raw;
     int lineNumber = 0;
-    int startCount = 0;
+    int starts = 0;
 
-    while (std::getline(input, rawLine)) {
+    while (std::getline(input, raw)) {
         ++lineNumber;
 
-        const int indentation = indentationOf(rawLine);
-        std::string line = trim(removeComment(rawLine));
+        const int indent = indentationOf(raw);
+        std::string line = trim(removeComment(raw));
 
         if (line.empty())
             continue;
 
-        // Logical operators continue the preceding comparison.
-        if (isLogicalContinuation(line)) {
-            if (program.instructions.empty()) {
+        if (line[0] == '.') {
+            if (indent != 0 || line.back() != ':') {
                 error = "Line " + std::to_string(lineNumber) +
-                        ": Logical operator has no preceding comparison.";
+                        ": Invalid label declaration or indentation.";
                 return false;
             }
 
-            Instruction& previous = program.instructions.back();
+            std::string name = line.substr(0, line.size() - 1);
 
-            if (previous.opcode != "cmp" &&
-                previous.opcode != "elcmp") {
+            if (!labelName(name)) {
                 error = "Line " + std::to_string(lineNumber) +
-                        ": Logical operators can only continue comparisons.";
+                        ": Invalid label.";
                 return false;
             }
 
-            if (previous.indentation != indentation) {
+            if (program.labels.count(name)) {
                 error = "Line " + std::to_string(lineNumber) +
-                        ": Logical continuation indentation does not match.";
+                        ": Duplicate label '" + name + "'.";
                 return false;
             }
 
-            previous.operand += " " + line;
-            continue;
-        }
+            program.labels[name] = program.instructions.size();
 
-        if (line.front() == '.') {
-            if (indentation != 0) {
-                error = "Line " + std::to_string(lineNumber) +
-                        ": Labels cannot be indented.";
-                return false;
-            }
-
-            if (line.back() != ':') {
-                error = "Line " + std::to_string(lineNumber) +
-                        ": Invalid label declaration.";
-                return false;
-            }
-
-            const std::string label =
-                line.substr(0, line.size() - 1);
-
-            if (!validLabel(label)) {
-                error = "Line " + std::to_string(lineNumber) +
-                        ": Invalid label '" + label + "'.";
-                return false;
-            }
-
-            if (program.labels.count(label)) {
-                error = "Line " + std::to_string(lineNumber) +
-                        ": Duplicate label '" + label + "'.";
-                return false;
-            }
-
-            program.labels[label] = program.instructions.size();
-
-            if (label == ".start")
-                ++startCount;
+            if (name == ".start")
+                ++starts;
 
             continue;
         }
 
         std::istringstream parts(line);
-
         std::string opcode;
         parts >> opcode;
 
@@ -470,87 +375,74 @@ bool parseProgram(
         operand = trim(operand);
 
         if (opcode == "var") {
-            if (indentation != 0) {
+            if (indent != 0) {
                 error = "Line " + std::to_string(lineNumber) +
                         ": Variable declarations must be unindented.";
                 return false;
             }
 
-            if (!parseVariable(
-                    operand,
-                    lineNumber,
-                    program,
-                    error
-                ))
+            if (!parseVariable(operand, lineNumber, program, error))
                 return false;
 
             continue;
         }
 
-        if (opcode == "el") {
-            if (operand.rfind("cmp ", 0) == 0) {
-                opcode = "elcmp";
-                operand = trim(operand.substr(4));
-            } else if (!operand.empty()) {
-                error = "Line " + std::to_string(lineNumber) +
-                        ": Invalid else instruction.";
-                return false;
-            }
-        }
-
-        if (!isOpcode(opcode) && opcode != "elcmp") {
+        if (!knownOpcode(opcode)) {
             error = "Line " + std::to_string(lineNumber) +
                     ": Unknown instruction '" + opcode + "'.";
             return false;
         }
 
-        if (opcode == "jmp" && !validLabel(operand)) {
+        if (opcode == "jmp" && !labelName(operand)) {
             error = "Line " + std::to_string(lineNumber) +
                     ": Invalid jump target.";
             return false;
         }
 
         if (opcode == "halt" &&
-            !operand.empty() &&
-            !validInteger(operand)) {
+            !operand.empty() && !integerLiteral(operand)) {
             error = "Line " + std::to_string(lineNumber) +
-                    ": halt requires an integer exit code.";
+                    ": Invalid halt exit code.";
             return false;
         }
 
-        if (isArithmetic(opcode)) {
-            if (opcode == "inc" ||
-                opcode == "dec" ||
-                opcode == "neg") {
-                if (!validIdentifier(operand)) {
+        if (opcode == "cmp" && operand.empty()) {
+            error = "Line " + std::to_string(lineNumber) +
+                    ": cmp requires a condition.";
+            return false;
+        }
+
+        if (opcode == "el" &&
+            !operand.empty() && operand.rfind("cmp ", 0) != 0) {
+            error = "Line " + std::to_string(lineNumber) +
+                    ": Expected 'el' or 'el cmp'.";
+            return false;
+        }
+
+        if (arithmeticOpcode(opcode)) {
+            if (opcode == "inc" || opcode == "dec" || opcode == "neg") {
+                if (!identifier(operand)) {
                     error = "Line " + std::to_string(lineNumber) +
                             ": Expected a variable name.";
                     return false;
                 }
             } else {
-                const auto equals = operand.find('=');
+                const auto equals = findOutsideString(operand, "=");
 
                 if (equals == std::string::npos ||
                     trim(operand.substr(0, equals)).empty() ||
                     trim(operand.substr(equals + 1)).empty()) {
                     error = "Line " + std::to_string(lineNumber) +
-                            ": Invalid arithmetic instruction.";
+                            ": Expected destination = value.";
                     return false;
                 }
             }
         }
 
-        if ((opcode == "cmp" || opcode == "elcmp") &&
-            operand.empty()) {
-            error = "Line " + std::to_string(lineNumber) +
-                    ": Comparison requires an expression.";
-            return false;
-        }
-
         if ((opcode == "mov" || opcode == "out" ||
              opcode == "outln") && operand.empty()) {
             error = "Line " + std::to_string(lineNumber) +
-                    ": Missing instruction operand.";
+                    ": Missing operand.";
             return false;
         }
 
@@ -558,21 +450,48 @@ bool parseProgram(
             opcode,
             operand,
             lineNumber,
-            indentation
+            indent
         });
+
+        // Logical continuation lines are attached to the preceding cmp.
+        // They are represented as cmp instructions with a continuation
+        // expression, so the interpreter can evaluate them together.
+        if (opcode == "cmp") {
+            // Continuations are merged in the second pass below.
+        }
     }
 
-    if (startCount != 1) {
+    if (starts != 1) {
         error = "Program must contain exactly one '.start:' label.";
         return false;
     }
 
-    for (const auto& instruction : program.instructions) {
-        if (instruction.opcode == "jmp" &&
-            !program.labels.count(instruction.operand)) {
-            error = "Line " + std::to_string(instruction.line) +
-                    ": Undefined label '" +
-                    instruction.operand + "'.";
+    // Merge logical continuation lines into the preceding cmp.
+    std::vector<Instruction> merged;
+
+    for (const auto& ins : program.instructions) {
+        if (ins.opcode == "&&" || ins.opcode == "||" ||
+            ins.opcode == "^^") {
+            if (merged.empty() || merged.back().opcode != "cmp") {
+                error = "Line " + std::to_string(ins.line) +
+                        ": Logical continuation must follow cmp.";
+                return false;
+            }
+
+            merged.back().operand += " " + ins.opcode + " " + ins.operand;
+            continue;
+        }
+
+        merged.push_back(ins);
+    }
+
+    program.instructions = std::move(merged);
+
+    for (const auto& ins : program.instructions) {
+        if (ins.opcode == "jmp" &&
+            !program.labels.count(ins.operand)) {
+            error = "Line " + std::to_string(ins.line) +
+                    ": Undefined label '" + ins.operand + "'.";
             return false;
         }
     }
