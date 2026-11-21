@@ -249,11 +249,11 @@ bool parseVariable(
 
 bool isBranchMarker(const Instruction& instruction) {
     return instruction.opcode == "cmp" ||
-           instruction.opcode == ;
+           instruction.opcode == "el";
 }
 
 bool isConditionalElse(const Instruction& instruction) {
-    return instruction.opcode ==  &&
+    return instruction.opcode == "el" &&
            instruction.operand.rfind("cmp ", 0) == 0;
 }
 
@@ -465,7 +465,7 @@ bool parseProgram(
             operand = trim(line.substr(separator + 1));
         }
 
-        if (opcode ==  &&
+        if (opcode == "el" &&
             operand.rfind("cmp ", 0) == 0) {
             // Keep the "cmp " prefix so the backend can
             // distinguish else-if from unconditional else.
@@ -490,7 +490,7 @@ bool parseProgram(
              opcode == "div" || opcode == "mod" ||
              opcode == "inc" || opcode == "dec" ||
              opcode == "neg" || opcode == "cmp" ||
-             opcode == "jmp" || opcode == "el") &&
+             opcode == "jmp") &&
             operand.empty()) {
             error = "Line " + std::to_string(lineNumber) +
                     ": Missing instruction operand.";
