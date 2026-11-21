@@ -19,8 +19,70 @@ jobs:
       - name: Configure CMake
         run: cmake -S . -B build -A x64
 
+      - name: Set up MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
       - name: Compile Flix
         run: cmake --build build --config Release --parallel
+
+      - name: Check Flix compiler version
+        run: build/bin/Release/flixc.exe version
+
+      - name: Test conditional branch chains
+        shell: pwsh
+        run: |
+          $compiler = "build/bin/Release/flixc.exe"
+
+          $tests = @(
+            @{
+              File = "examples/branch_chains.flix"
+              Expected = "Great"
+            },
+            @{
+              File = "examples/nested_branches.flix"
+              Expected = "Great"
+            },
+            @{
+              File = "examples/logical_continuations.flix"
+              Expected = "All conditions passed"
+            },
+            @{
+              File = "examples/branch_fallthrough.flix"
+              Expected = "Two"
+            }
+          )
+
+          foreach ($test in $tests) {
+            Write-Host "Testing $($test.File)"
+
+            & $compiler check $test.File
+            if ($LASTEXITCODE -ne 0) {
+              throw "Syntax check failed: $($test.File)"
+            }
+
+            $output = "test-output.exe"
+            & $compiler build $test.File -o $output
+
+            if ($LASTEXITCODE -ne 0) {
+              throw "Compilation failed: $($test.File)"
+            }
+
+            $actual = & ".\$output"
+            if ($LASTEXITCODE -ne 0) {
+              throw "Program execution failed: $($test.File)"
+            }
+
+            $actualText = ($actual -join "`n").Trim()
+
+            if ($actualText -ne $test.Expected) {
+              throw "Unexpected output for $($test.File). Expected '$($test.Expected)', got '$actualText'."
+            }
+
+            Remove-Item $output -ErrorAction SilentlyContinue
+            Remove-Item "test-output.generated.cpp" -ErrorAction SilentlyContinue
+          }
 
       - name: Prepare release files
         shell: pwsh
