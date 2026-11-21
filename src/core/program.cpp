@@ -387,6 +387,16 @@ bool parseProgram(
             continue;
         }
 
+        if (opcode == "&&" || opcode == "||" || opcode == "^^") {
+            program.instructions.push_back({
+                opcode,
+                operand,
+                lineNumber,
+                indent
+            });
+            continue;
+        }
+
         if (!knownOpcode(opcode)) {
             error = "Line " + std::to_string(lineNumber) +
                     ": Unknown instruction '" + opcode + "'.";
