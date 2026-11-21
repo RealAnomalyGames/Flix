@@ -1,44 +1,48 @@
+
 #include "flix/program.hpp"
 
-#include <algorithm>
 #include <cctype>
 #include <fstream>
+#include <regex>
 #include <sstream>
+#include <unordered_set>
 
 namespace flix {
+namespace {
 
-static std::string trim(const std::string& s) {
-    const auto first = s.find_first_not_of(" \t\r\n");
+std::string trim(const std::string& value) {
+    const auto first = value.find_first_not_of(" \t\r\n");
 
-    if (first == std::string::npos)
+    if (first == std::string::npos) {
         return "";
+    }
 
-    const auto last = s.find_last_not_of(" \t\r\n");
-
-    return s.substr(first, last - first + 1);
+    const auto last = value.find_last_not_of(" \t\r\n");
+    return value.substr(first, last - first + 1);
 }
 
-static int indentationOf(const std::string& s) {
+int indentationOf(const std::string& line) {
     int result = 0;
 
-    for (char c : s) {
-        if (c == ' ')
+    for (char c : line) {
+        if (c == ' ') {
             ++result;
-        else if (c == '\t')
+        } else if (c == '\t') {
             result += 4;
-        else
+        } else {
             break;
+        }
     }
 
     return result;
 }
 
-static std::string removeComment(const std::string& s) {
+std::string removeComment(const std::string& line) {
     bool quoted = false;
     bool escaped = false;
 
-    for (std::size_t i = 0; i < s.size(); ++i) {
-        char c = s[i];
+    for (std::size_t i = 0; i < line.size(); ++i) {
+        const char c = line[i];
 
         if (escaped) {
             escaped = false;
@@ -50,96 +54,44 @@ static std::string removeComment(const std::string& s) {
             continue;
         }
 
-        if (c == '"')
+        if (c == '"') {
             quoted = !quoted;
-
-        if (c == ';' && !quoted)
-            return s.substr(0, i);
-    }
-
-    return s;
-}
-
-static bool identifier(const std::string& s) {
-    if (s.empty())
-        return false;
-
-    if (!(std::isalpha(static_cast<unsigned char>(s[0])) ||
-          s[0] == '_'))
-        return false;
-
-    for (char c : s) {
-        if (!(std::isalnum(static_cast<unsigned char>(c)) || c == '_'))
-            return false;
-    }
-
-    return true;
-}
-
-static bool labelName(const std::string& s) {
-    return s.size() > 1 && s[0] == '.' &&
-           identifier(s.substr(1));
-}
-
-static bool integerLiteral(const std::string& s) {
-    if (s.empty())
-        return false;
-
-    std::size_t i = 0;
-
-    if (s[i] == '+' || s[i] == '-')
-        ++i;
-
-    if (i == s.size())
-        return false;
-
-    for (; i < s.size(); ++i) {
-        if (!std::isdigit(static_cast<unsigned char>(s[i])))
-            return false;
-    }
-
-    return true;
-}
-
-static bool floatLiteral(const std::string& s) {
-    if (s.empty())
-        return false;
-
-    std::size_t i = 0;
-
-    if (s[i] == '+' || s[i] == '-')
-        ++i;
-
-    bool dot = false;
-    bool digit = false;
-
-    for (; i < s.size(); ++i) {
-        if (s[i] == '.' && !dot) {
-            dot = true;
             continue;
         }
 
-        if (!std::isdigit(static_cast<unsigned char>(s[i])))
-            return false;
-
-        digit = true;
+        if (c == ';' && !quoted) {
+            return line.substr(0, i);
+        }
     }
 
-    return dot && digit;
+    return line;
 }
 
-static bool stringLiteral(const std::string& s) {
-    if (s.size() < 2 || s.front() != '"' || s.back() != '"')
+bool validIdentifier(const std::string& name) {
+    static const std::regex pattern(
+        R"([A-Za-z_][A-Za-z0-9_]*)"
+    );
+
+    return std::regex_match(name, pattern);
+}
+
+bool validString(const std::string& value) {
+    if (value.size() < 2 ||
+        value.front() != '"' ||
+        value.back() != '"') {
         return false;
+    }
 
     bool escaped = false;
 
-    for (std::size_t i = 1; i + 1 < s.size(); ++i) {
-        char c = s[i];
+    for (std::size_t i = 1; i + 1 < value.size(); ++i) {
+        const char c = value[i];
 
         if (escaped) {
-            if (c != 'n' && c != 't' && c != '"' && c != '\\')
+            if (c != 'n' && c != 't' &&
+                c != '"' && c != '\\') {
                 return false;
+            }
 
             escaped = false;
         } else if (c == '\\') {
@@ -152,141 +104,138 @@ static bool stringLiteral(const std::string& s) {
     return !escaped;
 }
 
-static bool booleanLiteral(const std::string& s) {
-    return s == "true" || s == "false";
-}
+bool validNumber(const std::string& value, bool& isFloat) {
+    static const std::regex integerPattern(
+        R"([+-]?[0-9]+)"
+    );
 
-static bool parseType(const std::string& s, ValueType& type) {
-    if (s == "int") {
-        type = ValueType::Integer;
+    static const std::regex floatPattern(
+        R"([+-]?[0-9]+\.[0-9]+)"
+    );
+
+    if (std::regex_match(value, integerPattern)) {
+        isFloat = false;
         return true;
     }
 
-    if (s == "float") {
-        type = ValueType::Float;
-        return true;
-    }
-
-    if (s == "str") {
-        type = ValueType::String;
-        return true;
-    }
-
-    if (s == "bool") {
-        type = ValueType::Boolean;
+    if (std::regex_match(value, floatPattern)) {
+        isFloat = true;
         return true;
     }
 
     return false;
 }
 
-std::string valueTypeName(ValueType type) {
-    switch (type) {
-        case ValueType::Integer: return "int";
-        case ValueType::Float: return "float";
-        case ValueType::String: return "str";
-        case ValueType::Boolean: return "bool";
+bool parseType(const std::string& name, ValueType& type) {
+    if (name == "int") {
+        type = ValueType::Integer;
+    } else if (name == "float") {
+        type = ValueType::Float;
+    } else if (name == "str") {
+        type = ValueType::String;
+    } else if (name == "bool") {
+        type = ValueType::Boolean;
+    } else {
+        return false;
     }
 
-    return "unknown";
+    return true;
 }
 
-static std::size_t findOutsideString(
-    const std::string& s,
-    const std::string& target
+bool validLiteral(
+    const std::string& value,
+    ValueType expected
 ) {
-    bool quoted = false;
-    bool escaped = false;
-
-    for (std::size_t i = 0; i + target.size() <= s.size(); ++i) {
-        char c = s[i];
-
-        if (escaped) {
-            escaped = false;
-            continue;
-        }
-
-        if (quoted && c == '\\') {
-            escaped = true;
-            continue;
-        }
-
-        if (c == '"')
-            quoted = !quoted;
-
-        if (!quoted && s.compare(i, target.size(), target) == 0)
-            return i;
+    if (expected == ValueType::String) {
+        return validString(value);
     }
 
-    return std::string::npos;
+    if (expected == ValueType::Boolean) {
+        return value == "true" || value == "false";
+    }
+
+    bool isFloat = false;
+
+    if (!validNumber(value, isFloat)) {
+        return false;
+    }
+
+    return expected != ValueType::Integer || !isFloat;
 }
 
-static bool parseVariable(
-    const std::string& operand,
+bool parseVariable(
+    const std::string& text,
     int line,
     Program& program,
     std::string& error
 ) {
-    const auto colon = operand.find(':');
+    const std::string declaration = trim(text.substr(4));
+    const auto colon = declaration.find(':');
 
     if (colon == std::string::npos) {
         error = "Line " + std::to_string(line) +
-                ": Variable declaration requires a type.";
+                ": Expected var name:type.";
         return false;
     }
 
-    const std::string name = trim(operand.substr(0, colon));
-    const std::string rest = trim(operand.substr(colon + 1));
+    const std::string name =
+        trim(declaration.substr(0, colon));
 
-    if (!identifier(name)) {
+    const std::string remainder =
+        trim(declaration.substr(colon + 1));
+
+    const auto equals = remainder.find('=');
+
+    const std::string typeName =
+        equals == std::string::npos
+            ? remainder
+            : trim(remainder.substr(0, equals));
+
+    std::string initial =
+        equals == std::string::npos
+            ? ""
+            : trim(remainder.substr(equals + 1));
+
+    if (!validIdentifier(name)) {
         error = "Line " + std::to_string(line) +
                 ": Invalid variable name '" + name + "'.";
         return false;
     }
 
-    if (program.variables.count(name)) {
+    if (program.variables.contains(name)) {
         error = "Line " + std::to_string(line) +
-                ": Variable '" + name + "' is already declared.";
+                ": Duplicate variable '" + name + "'.";
         return false;
     }
-
-    const auto equals = rest.find('=');
-
-    const std::string typeText = trim(rest.substr(0, equals));
 
     ValueType type;
 
-    if (!parseType(typeText, type)) {
+    if (!parseType(typeName, type)) {
         error = "Line " + std::to_string(line) +
-                ": Unknown type '" + typeText + "'.";
+                ": Unknown type '" + typeName + "'.";
         return false;
     }
 
-    std::string initial;
-
-    if (equals != std::string::npos) {
-        initial = trim(rest.substr(equals + 1));
-    } else {
+    if (initial.empty()) {
         switch (type) {
-            case ValueType::Integer: initial = "0"; break;
-            case ValueType::Float: initial = "0.0"; break;
-            case ValueType::String: initial = "\"\""; break;
-            case ValueType::Boolean: initial = "false"; break;
+        case ValueType::Integer:
+            initial = "0";
+            break;
+        case ValueType::Float:
+            initial = "0.0";
+            break;
+        case ValueType::String:
+            initial = "\"\"";
+            break;
+        case ValueType::Boolean:
+            initial = "false";
+            break;
         }
     }
 
-    bool valid = false;
-
-    switch (type) {
-        case ValueType::Integer: valid = integerLiteral(initial); break;
-        case ValueType::Float: valid = floatLiteral(initial); break;
-        case ValueType::String: valid = stringLiteral(initial); break;
-        case ValueType::Boolean: valid = booleanLiteral(initial); break;
-    }
-
-    if (!valid) {
+    if (!validLiteral(initial, type)) {
         error = "Line " + std::to_string(line) +
-                ": Initial value does not match type '" + typeText + "'.";
+                ": Invalid initial value for '" + name + "'.";
         return false;
     }
 
@@ -298,21 +247,97 @@ static bool parseVariable(
     return true;
 }
 
-static bool knownOpcode(const std::string& op) {
-    static const std::vector<std::string> names = {
-        "mov", "out", "outln", "jmp", "halt",
-        "add", "sub", "mul", "div", "mod",
-        "inc", "dec", "neg", "cmp", "el"
-    };
-
-    return std::find(names.begin(), names.end(), op) != names.end();
+bool isBranchMarker(const Instruction& instruction) {
+    return instruction.opcode == "cmp" ||
+           instruction.opcode == "el";
 }
 
-static bool arithmeticOpcode(const std::string& op) {
-    return op == "add" || op == "sub" ||
-           op == "mul" || op == "div" ||
-           op == "mod" || op == "inc" ||
-           op == "dec" || op == "neg";
+bool isConditionalElse(const Instruction& instruction) {
+    return instruction.opcode == "el" &&
+           instruction.operand.rfind("cmp ", 0) == 0;
+}
+
+void buildBranchMetadata(Program& program) {
+    auto& instructions = program.instructions;
+
+    int nextBranchId = 0;
+
+    for (std::size_t i = 0; i < instructions.size(); ++i) {
+        if (!isBranchMarker(instructions[i])) {
+            continue;
+        }
+
+        // If this marker already belongs to a previously
+        // discovered chain, it has already been processed.
+        if (instructions[i].branch_id != -1) {
+            continue;
+        }
+
+        const int indentation = instructions[i].indentation;
+        const int branchId = nextBranchId++;
+
+        std::vector<std::size_t> markers;
+        markers.push_back(i);
+
+        std::size_t cursor = i + 1;
+
+        // Find sibling branches at this indentation level.
+        // Nested branches have greater indentation and are
+        // deliberately ignored by this scan.
+        while (cursor < instructions.size()) {
+            const auto& candidate = instructions[cursor];
+
+            if (candidate.indentation < indentation) {
+                break;
+            }
+
+            if (candidate.indentation == indentation) {
+                if (isBranchMarker(candidate)) {
+                    markers.push_back(cursor);
+                    ++cursor;
+                    continue;
+                }
+
+                // A non-branch instruction at the same
+                // indentation ends the conditional chain.
+                break;
+            }
+
+            ++cursor;
+        }
+
+        const std::size_t groupEnd = cursor;
+
+        for (std::size_t m = 0; m < markers.size(); ++m) {
+            auto& marker = instructions[markers[m]];
+
+            marker.branch_id = branchId;
+            marker.branch_first = (m == 0);
+            marker.branch_end = groupEnd;
+
+            marker.branch_next =
+                m + 1 < markers.size()
+                    ? markers[m + 1]
+                    : groupEnd;
+        }
+    }
+}
+
+} // namespace
+
+std::string valueTypeName(ValueType type) {
+    switch (type) {
+    case ValueType::Integer:
+        return "int";
+    case ValueType::Float:
+        return "float";
+    case ValueType::String:
+        return "str";
+    case ValueType::Boolean:
+        return "bool";
+    }
+
+    return "unknown";
 }
 
 bool parseProgram(
@@ -323,190 +348,232 @@ bool parseProgram(
     program = Program{};
     error.clear();
 
-    std::istringstream input(source);
-    std::string raw;
-    int lineNumber = 0;
-    int starts = 0;
+    std::istringstream stream(source);
+    std::string rawLine;
 
-    while (std::getline(input, raw)) {
+    int lineNumber = 0;
+    int startCount = 0;
+
+    while (std::getline(stream, rawLine)) {
         ++lineNumber;
 
-        const int indent = indentationOf(raw);
-        std::string line = trim(removeComment(raw));
+        const int indentation = indentationOf(rawLine);
 
-        if (line.empty())
-            continue;
+        const std::string line =
+            trim(removeComment(rawLine));
 
-        if (line[0] == '.') {
-            if (indent != 0 || line.back() != ':') {
-                error = "Line " + std::to_string(lineNumber) +
-                        ": Invalid label declaration or indentation.";
-                return false;
-            }
-
-            std::string name = line.substr(0, line.size() - 1);
-
-            if (!labelName(name)) {
-                error = "Line " + std::to_string(lineNumber) +
-                        ": Invalid label.";
-                return false;
-            }
-
-            if (program.labels.count(name)) {
-                error = "Line " + std::to_string(lineNumber) +
-                        ": Duplicate label '" + name + "'.";
-                return false;
-            }
-
-            program.labels[name] = program.instructions.size();
-
-            if (name == ".start")
-                ++starts;
-
+        if (line.empty()) {
             continue;
         }
 
-        std::istringstream parts(line);
-        std::string opcode;
-        parts >> opcode;
+        // Logical continuation lines extend the previous
+        // cmp or el cmp condition.
+        if (line.rfind("&& ", 0) == 0 ||
+            line.rfind("|| ", 0) == 0 ||
+            line.rfind("^^ ", 0) == 0) {
 
-        std::string operand;
-        std::getline(parts, operand);
-        operand = trim(operand);
-
-        if (opcode == "var") {
-            if (indent != 0) {
+            if (program.instructions.empty()) {
                 error = "Line " + std::to_string(lineNumber) +
-                        ": Variable declarations must be unindented.";
+                        ": Logical continuation has no preceding condition.";
                 return false;
             }
 
-            if (!parseVariable(operand, lineNumber, program, error))
-                return false;
+            auto& previous = program.instructions.back();
 
+            const bool validPrevious =
+                previous.opcode == "cmp" ||
+                isConditionalElse(previous);
+
+            if (!validPrevious) {
+                error = "Line " + std::to_string(lineNumber) +
+                        ": Logical continuation must follow cmp or el cmp.";
+                return false;
+            }
+
+            if (indentation <= previous.indentation) {
+                error = "Line " + std::to_string(lineNumber) +
+                        ": Logical continuation must be indented beneath its condition.";
+                return false;
+            }
+
+            previous.operand += " " + line;
             continue;
         }
 
-        if (opcode == "&&" || opcode == "||" || opcode == "^^") {
-            program.instructions.push_back({
-                opcode,
-                operand,
+        if (line.rfind("var ", 0) == 0) {
+            if (indentation != 0) {
+                error = "Line " + std::to_string(lineNumber) +
+                        ": Variable declarations must be top-level.";
+                return false;
+            }
+
+            if (!parseVariable(
+                line,
                 lineNumber,
-                indent
-            });
+                program,
+                error
+            )) {
+                return false;
+            }
+
             continue;
         }
 
-        if (!knownOpcode(opcode)) {
+        if (line.front() == '.') {
+            if (indentation != 0 || line.back() != ':') {
+                error = "Line " + std::to_string(lineNumber) +
+                        ": Invalid label declaration.";
+                return false;
+            }
+
+            const std::string label =
+                line.substr(1, line.size() - 2);
+
+            if (!validIdentifier(label)) {
+                error = "Line " + std::to_string(lineNumber) +
+                        ": Invalid label name.";
+                return false;
+            }
+
+            if (program.labels.contains(label)) {
+                error = "Line " + std::to_string(lineNumber) +
+                        ": Duplicate label '" + label + "'.";
+                return false;
+            }
+
+            program.labels[label] =
+                program.instructions.size();
+
+            if (label == "start") {
+                ++startCount;
+                program.entry_point =
+                    program.instructions.size();
+            }
+
+            continue;
+        }
+
+        std::string opcode;
+        std::string operand;
+
+        const auto separator = line.find_first_of(" \t");
+
+        if (separator == std::string::npos) {
+            opcode = line;
+        } else {
+            opcode = line.substr(0, separator);
+            operand = trim(line.substr(separator + 1));
+        }
+
+        if (opcode == "el" &&
+            operand.rfind("cmp ", 0) == 0) {
+            // Keep the "cmp " prefix so the backend can
+            // distinguish else-if from unconditional else.
+        }
+
+        static const std::unordered_set<std::string> known = {
+            "out", "outln", "mov",
+            "add", "sub", "mul", "div", "mod",
+            "inc", "dec", "neg",
+            "cmp", "el", "jmp", "halt"
+        };
+
+        if (!known.contains(opcode)) {
             error = "Line " + std::to_string(lineNumber) +
                     ": Unknown instruction '" + opcode + "'.";
             return false;
         }
 
-        if (opcode == "jmp" && !labelName(operand)) {
+        if ((opcode == "out" || opcode == "outln" ||
+             opcode == "mov" || opcode == "add" ||
+             opcode == "sub" || opcode == "mul" ||
+             opcode == "div" || opcode == "mod" ||
+             opcode == "inc" || opcode == "dec" ||
+             opcode == "neg" || opcode == "cmp" ||
+             opcode == "jmp" || opcode == "el") &&
+            operand.empty()) {
             error = "Line " + std::to_string(lineNumber) +
-                    ": Invalid jump target.";
+                    ": Missing instruction operand.";
             return false;
         }
 
-        if (opcode == "halt" &&
-            !operand.empty() && !integerLiteral(operand)) {
+        if (opcode == "jmp" &&
+            (operand.size() < 2 || operand.front() != '.')) {
             error = "Line " + std::to_string(lineNumber) +
-                    ": Invalid halt exit code.";
-            return false;
-        }
-
-        if (opcode == "cmp" && operand.empty()) {
-            error = "Line " + std::to_string(lineNumber) +
-                    ": cmp requires a condition.";
+                    ": Expected jmp .Label.";
             return false;
         }
 
         if (opcode == "el" &&
-            !operand.empty() && operand.rfind("cmp ", 0) != 0) {
+            !operand.empty() &&
+            operand.rfind("cmp ", 0) != 0) {
             error = "Line " + std::to_string(lineNumber) +
-                    ": Expected 'el' or 'el cmp'.";
+                    ": Expected el cmp condition or el.";
             return false;
         }
 
-        if (arithmeticOpcode(opcode)) {
-            if (opcode == "inc" || opcode == "dec" || opcode == "neg") {
-                if (!identifier(operand)) {
-                    error = "Line " + std::to_string(lineNumber) +
-                            ": Expected a variable name.";
-                    return false;
-                }
-            } else {
-                const auto equals = findOutsideString(operand, "=");
+        if (opcode == "halt" && !operand.empty()) {
+            bool isFloat = false;
 
-                if (equals == std::string::npos ||
-                    trim(operand.substr(0, equals)).empty() ||
-                    trim(operand.substr(equals + 1)).empty()) {
-                    error = "Line " + std::to_string(lineNumber) +
-                            ": Expected destination = value.";
-                    return false;
-                }
+            if (!validNumber(operand, isFloat) || isFloat) {
+                error = "Line " + std::to_string(lineNumber) +
+                        ": halt requires an integer exit code.";
+                return false;
             }
-        }
-
-        if ((opcode == "mov" || opcode == "out" ||
-             opcode == "outln") && operand.empty()) {
-            error = "Line " + std::to_string(lineNumber) +
-                    ": Missing operand.";
-            return false;
         }
 
         program.instructions.push_back({
             opcode,
             operand,
             lineNumber,
-            indent
+            indentation
         });
-
-        // Logical continuation lines are attached to the preceding cmp.
-        // They are represented as cmp instructions with a continuation
-        // expression, so the interpreter can evaluate them together.
-        if (opcode == "cmp") {
-            // Continuations are merged in the second pass below.
-        }
     }
 
-    if (starts != 1) {
-        error = "Program must contain exactly one '.start:' label.";
+    if (startCount != 1) {
+        error = "Program must contain exactly one .start: label.";
         return false;
     }
 
-    // Merge logical continuation lines into the preceding cmp.
-    std::vector<Instruction> merged;
-
-    for (const auto& ins : program.instructions) {
-        if (ins.opcode == "&&" || ins.opcode == "||" ||
-            ins.opcode == "^^") {
-            if (merged.empty() || merged.back().opcode != "cmp") {
-                error = "Line " + std::to_string(ins.line) +
-                        ": Logical continuation must follow cmp.";
-                return false;
-            }
-
-            merged.back().operand += " " + ins.opcode + " " + ins.operand;
+    // Validate all jump targets.
+    for (const auto& instruction : program.instructions) {
+        if (instruction.opcode != "jmp") {
             continue;
         }
 
-        merged.push_back(ins);
-    }
+        const std::string label =
+            instruction.operand.substr(1);
 
-    program.instructions = std::move(merged);
-
-    for (const auto& ins : program.instructions) {
-        if (ins.opcode == "jmp" &&
-            !program.labels.count(ins.operand)) {
-            error = "Line " + std::to_string(ins.line) +
-                    ": Undefined label '" + ins.operand + "'.";
+        if (!program.labels.contains(label)) {
+            error = "Line " + std::to_string(instruction.line) +
+                    ": Undefined label '" + label + "'.";
             return false;
         }
     }
 
-    program.entry_point = program.labels.at(".start");
+    buildBranchMetadata(program);
+
+    // Every else/else-if must belong to a chain that starts
+    // with cmp. An else cannot be the first branch.
+    for (std::size_t i = 0; i < program.instructions.size(); ++i) {
+        const auto& instruction = program.instructions[i];
+
+        if (instruction.opcode != "el") {
+            continue;
+        }
+
+        if (instruction.branch_id < 0) {
+            error = "Line " + std::to_string(instruction.line) +
+                    ": el does not belong to a conditional chain.";
+            return false;
+        }
+
+        if (instruction.branch_first) {
+            error = "Line " + std::to_string(instruction.line) +
+                    ": A conditional chain must begin with cmp.";
+            return false;
+        }
+    }
 
     return true;
 }
@@ -516,17 +583,21 @@ bool loadProgram(
     Program& program,
     std::string& error
 ) {
-    std::ifstream file(path);
+    std::ifstream file(path, std::ios::binary);
 
     if (!file) {
-        error = "Unable to open file '" + path + "'.";
+        error = "Unable to open source file: " + path;
         return false;
     }
 
     std::ostringstream contents;
     contents << file.rdbuf();
 
-    return parseProgram(contents.str(), program, error);
+    return parseProgram(
+        contents.str(),
+        program,
+        error
+    );
 }
 
 }
