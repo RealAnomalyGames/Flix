@@ -10,7 +10,7 @@ var name:str = "John Doe"
     cmp lives > 0 || passcode == 0
         outln "Player can continue."
 
-    cmp !(lives == 0)
+    cmp !lives == 0
         outln "Player still has lives."
 
     cmp lives > 0 ^^ passcode == 0
