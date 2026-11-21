@@ -1,10 +1,9 @@
-
 #pragma once
 
-#include <string>
-#include <vector>
-#include <unordered_map>
 #include <cstddef>
+#include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace flix {
 
@@ -19,23 +18,23 @@ struct Variable {
     std::string name;
     ValueType type;
     std::string initial_value;
-    int line;
+    int line = 0;
 };
 
 struct Instruction {
     std::string opcode;
     std::string operand;
-    int line;
+    int line = 0;
+
+    // Leading indentation, with tabs normalized to four spaces.
+    int indentation = 0;
 };
 
 struct Program {
     std::vector<Instruction> instructions;
-
-    std::unordered_map<std::string, size_t> labels;
-
+    std::unordered_map<std::string, std::size_t> labels;
     std::unordered_map<std::string, Variable> variables;
-
-    size_t entry_point = 0;
+    std::size_t entry_point = 0;
 };
 
 bool parseProgram(
