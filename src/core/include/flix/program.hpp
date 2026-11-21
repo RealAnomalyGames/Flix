@@ -25,8 +25,6 @@ struct Instruction {
     std::string opcode;
     std::string operand;
     int line = 0;
-
-    // Leading indentation, with tabs normalized to four spaces.
     int indentation = 0;
 };
 
