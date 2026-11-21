@@ -190,7 +190,7 @@ static std::string decodeString(const std::string& value) {
     return result;
 }
 
-static std::string valueTypeName(ValueType type) {
+static std::string typeNameImpl(ValueType type) {
     switch (type) {
         case ValueType::Integer: return "int";
         case ValueType::Float: return "float";
