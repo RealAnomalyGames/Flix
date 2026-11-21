@@ -63,5 +63,5 @@ jobs:
           gh release create "${{ github.ref_name }}" `
             dist/flix.exe `
             dist/flixc.exe `
+            dist/flix.flib `
             --title "Flix ${{ github.ref_name }}" `
-            --generate-notes
