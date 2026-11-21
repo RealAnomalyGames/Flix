@@ -15,7 +15,7 @@ int main(int argc, char* argv[]) {
     const std::string command = argv[1];
 
     if (command == "version") {
-        std::cout << "Flix Compiler " << FLIX_VERSION << "\n";
+        std::cout << "Flix Compiler " << flix::version() << "\n";
         return 0;
     }
 
