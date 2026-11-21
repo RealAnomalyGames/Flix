@@ -1,10 +1,12 @@
 
 #include "flix/program.hpp"
 
-#include <algorithm>
-#include <cctype>
 #include <fstream>
 #include <sstream>
+#include <cctype>
+#include <algorithm>
+#include <stdexcept>
+#include <iterator>
 
 namespace flix {
 
@@ -16,41 +18,258 @@ static std::string trim(const std::string& value) {
 
     const auto last = value.find_last_not_of(" \t\r\n");
 
-    return value.substr(first, last - first + 1);
+    return value.substr(0, last - first + 1);
 }
 
 static std::string removeComment(const std::string& line) {
     bool quoted = false;
+    bool escaped = false;
 
     for (size_t i = 0; i < line.size(); ++i) {
-        if (line[i] == '"' && (i == 0 || line[i - 1] != '\\'))
+        char c = line[i];
+
+        if (c == '"' && !escaped)
             quoted = !quoted;
 
-        if (line[i] == ';' && !quoted)
+        if (c == ';' && !quoted)
             return line.substr(0, i);
+
+        if (c == '\\' && !escaped)
+            escaped = true;
+        else
+            escaped = false;
     }
 
     return line;
 }
 
-static bool validLabel(const std::string& label) {
-    if (label.size() < 2 || label[0] != '.')
+static bool validIdentifier(const std::string& name) {
+    if (name.empty())
         return false;
 
-    if (!std::isalpha(
-        static_cast<unsigned char>(label[1])) &&
-        label[1] != '_')
+    if (!std::isalpha(static_cast<unsigned char>(name[0])) &&
+        name[0] != '_')
         return false;
 
-    for (size_t i = 2; i < label.size(); ++i) {
-        unsigned char c =
-            static_cast<unsigned char>(label[i]);
+    for (char c : name) {
+        unsigned char u = static_cast<unsigned char>(c);
 
-        if (!std::isalnum(c) && c != '_')
+        if (!std::isalnum(u) && c != '_')
             return false;
     }
 
     return true;
+}
+
+static bool validLabel(const std::string& label) {
+    return label.size() > 1 &&
+           label[0] == '.' &&
+           validIdentifier(label.substr(1));
+}
+
+static bool validInteger(const std::string& value) {
+    if (value.empty())
+        return false;
+
+    size_t i = (value[0] == '-' || value[0] == '+') ? 1 : 0;
+
+    if (i == value.size())
+        return false;
+
+    for (; i < value.size(); ++i) {
+        if (!std::isdigit(static_cast<unsigned char>(value[i])))
+            return false;
+    }
+
+    return true;
+}
+
+static bool validFloat(const std::string& value) {
+    if (value.empty())
+        return false;
+
+    size_t i = 0;
+
+    if (value[i] == '-' || value[i] == '+')
+        ++i;
+
+    bool digits = false;
+    bool decimal = false;
+
+    for (; i < value.size(); ++i) {
+        char c = value[i];
+
+        if (std::isdigit(static_cast<unsigned char>(c))) {
+            digits = true;
+        }
+        else if (c == '.' && !decimal) {
+            decimal = true;
+        }
+        else {
+            return false;
+        }
+    }
+
+    return digits && decimal;
+}
+
+static bool validString(const std::string& value) {
+    if (value.size() < 2 ||
+        value.front() != '"' ||
+        value.back() != '"')
+        return false;
+
+    bool escaped = false;
+
+    for (size_t i = 1; i + 1 < value.size(); ++i) {
+        char c = value[i];
+
+        if (c == '"' && !escaped)
+            return false;
+
+        if (c == '\\' && !escaped)
+            escaped = true;
+        else
+            escaped = false;
+    }
+
+    return !escaped;
+}
+
+static bool validBoolean(const std::string& value) {
+    return value == "true" || value == "false";
+}
+
+static bool validValue(
+    ValueType type,
+    const std::string& value
+) {
+    switch (type) {
+        case ValueType::Integer:
+            return validInteger(value);
+
+        case ValueType::Float:
+            return validFloat(value);
+
+        case ValueType::String:
+            return validString(value);
+
+        case ValueType::Boolean:
+            return validBoolean(value);
+    }
+
+    return false;
+}
+
+std::string valueTypeName(ValueType type) {
+    switch (type) {
+        case ValueType::Integer: return "int";
+        case ValueType::Float: return "float";
+        case ValueType::String: return "str";
+        case ValueType::Boolean: return "bool";
+    }
+
+    return "unknown";
+}
+
+static bool parseVariable(
+    const std::string& operand,
+    int line,
+    Program& program,
+    std::string& error
+) {
+    size_t colon = operand.find(':');
+
+    if (colon == std::string::npos) {
+        error = "Line " + std::to_string(line) +
+                ": Variable declaration requires a type.";
+
+        return false;
+    }
+
+    std::string name = trim(operand.substr(0, colon));
+    std::string remainder = trim(operand.substr(colon + 1));
+
+    if (!validIdentifier(name)) {
+        error = "Line " + std::to_string(line) +
+                ": Invalid variable name '" + name + "'.";
+
+        return false;
+    }
+
+    if (program.variables.count(name)) {
+        error = "Line " + std::to_string(line) +
+                ": Duplicate variable '" + name + "'.";
+
+        return false;
+    }
+
+    size_t equals = remainder.find('=');
+
+    std::string typeName = trim(
+        remainder.substr(0, equals)
+    );
+
+    std::string initialValue;
+
+    if (equals != std::string::npos)
+        initialValue = trim(remainder.substr(equals + 1));
+
+    ValueType type;
+
+    if (typeName == "int")
+        type = ValueType::Integer;
+    else if (typeName == "float")
+        type = ValueType::Float;
+    else if (typeName == "str")
+        type = ValueType::String;
+    else if (typeName == "bool")
+        type = ValueType::Boolean;
+    else {
+        error = "Line " + std::to_string(line) +
+                ": Unknown variable type '" + typeName + "'.";
+
+        return false;
+    }
+
+    if (equals != std::string::npos &&
+        !validValue(type, initialValue)) {
+
+        error = "Line " + std::to_string(line) +
+                ": Invalid initial value for variable '" +
+                name + "'.";
+
+        return false;
+    }
+
+    program.variables.emplace(
+        name,
+        Variable{name, type, initialValue, line}
+    );
+
+    return true;
+}
+
+static size_t findSeparator(const std::string& text) {
+    bool quoted = false;
+    bool escaped = false;
+
+    for (size_t i = 0; i < text.size(); ++i) {
+        char c = text[i];
+
+        if (c == '"' && !escaped)
+            quoted = !quoted;
+
+        if (c == ',' && !quoted)
+            return i;
+
+        if (c == '\\' && !escaped)
+            escaped = true;
+        else
+            escaped = false;
+    }
+
+    return std::string::npos;
 }
 
 bool parseProgram(
@@ -75,7 +294,6 @@ bool parseProgram(
         if (line.empty())
             continue;
 
-        // Label declaration
         if (line.front() == '.') {
             if (line.back() != ':') {
                 error = "Line " +
@@ -99,8 +317,7 @@ bool parseProgram(
             if (program.labels.count(label)) {
                 error = "Line " +
                     std::to_string(lineNumber) +
-                    ": Duplicate label '" +
-                    label + "'.";
+                    ": Duplicate label '" + label + "'.";
 
                 return false;
             }
@@ -110,7 +327,6 @@ bool parseProgram(
 
             if (label == ".start") {
                 ++startCount;
-
                 program.entry_point =
                     program.instructions.size();
             }
@@ -118,7 +334,6 @@ bool parseProgram(
             continue;
         }
 
-        // Instruction parsing
         std::istringstream parts(line);
 
         Instruction instruction;
@@ -127,8 +342,20 @@ bool parseProgram(
         parts >> instruction.opcode;
 
         std::getline(parts, instruction.operand);
-
         instruction.operand = trim(instruction.operand);
+
+        if (instruction.opcode == "var") {
+            if (!parseVariable(
+                instruction.operand,
+                lineNumber,
+                program,
+                error
+            )) {
+                return false;
+            }
+
+            continue;
+        }
 
         if (instruction.opcode == "jmp") {
             if (!validLabel(instruction.operand)) {
@@ -140,37 +367,65 @@ bool parseProgram(
             }
         }
         else if (instruction.opcode == "halt") {
-            if (!instruction.operand.empty()) {
-                try {
-                    size_t parsed = 0;
+            if (!instruction.operand.empty() &&
+                !validInteger(instruction.operand)) {
 
-                    std::stoll(
-                        instruction.operand,
-                        &parsed
-                    );
+                error = "Line " +
+                    std::to_string(lineNumber) +
+                    ": Invalid halt value.";
 
-                    if (parsed != instruction.operand.size())
-                        throw std::invalid_argument("Invalid value");
-                }
-                catch (...) {
+                return false;
+            }
+        }
+        else if (instruction.opcode == "outln") {
+            if (instruction.operand.empty()) {
+                error = "Line " +
+                    std::to_string(lineNumber) +
+                    ": Missing output value.";
+
+                return false;
+            }
+
+            if (instruction.operand.front() == '"') {
+                if (!validString(instruction.operand)) {
                     error = "Line " +
                         std::to_string(lineNumber) +
-                        ": Invalid halt value.";
+                        ": Invalid string literal.";
 
                     return false;
                 }
             }
-        }
-        else if (instruction.opcode == "outln") {
-            const std::string& value = instruction.operand;
+            else if (!validIdentifier(instruction.operand)) {
+                error = "Line " +
+                    std::to_string(lineNumber) +
+                    ": Invalid output operand.";
 
-            if (value.size() < 2 ||
-                value.front() != '"' ||
-                value.back() != '"') {
+                return false;
+            }
+        }
+        else if (instruction.opcode == "mov") {
+            size_t comma = findSeparator(instruction.operand);
+
+            if (comma == std::string::npos) {
+                error = "Line " +
+                    std::to_string(lineNumber) +
+                    ": mov requires two operands.";
+
+                return false;
+            }
+
+            std::string destination =
+                trim(instruction.operand.substr(0, comma));
+
+            std::string sourceValue =
+                trim(instruction.operand.substr(comma + 1));
+
+            if (!validIdentifier(destination) ||
+                sourceValue.empty()) {
 
                 error = "Line " +
                     std::to_string(lineNumber) +
-                    ": outln requires a quoted string.";
+                    ": Invalid mov operands.";
 
                 return false;
             }
@@ -194,9 +449,6 @@ bool parseProgram(
 
         return false;
     }
-
-    // Validate jump destinations after all labels
-    // have been registered.
 
     for (const auto& instruction : program.instructions) {
         if (instruction.opcode == "jmp") {
