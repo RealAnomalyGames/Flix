@@ -1,8 +1,11 @@
+var number:int = 999999999999999999999999999999
+var addition:int = 1
+
 .start:
-    var score:int = 999999999999999999999999999999999999999999999999
-    var distance:float = 123456789012345678901234567890.123456789
+    add number = addition
+    outln number
 
-    outln score
-    outln distance
+    mul number = 2
+    outln number
 
-    halt 0
+    halt
