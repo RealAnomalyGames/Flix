@@ -10,38 +10,33 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Statically link the MSVC runtime so users do not
-# need to install the Visual C++ Redistributable.
 if(MSVC)
     set(CMAKE_MSVC_RUNTIME_LIBRARY
         "MultiThreaded$<$<CONFIG:Debug>:Debug>"
     )
 endif()
 
-# Shared Flix core
 add_library(flix_core STATIC
     src/core/version.cpp
+    src/core/program.cpp
 )
 
 target_include_directories(flix_core PUBLIC
     src/core/include
 )
 
-# Interpreter
 add_executable(flix
     src/interpreter/main.cpp
 )
 
 target_link_libraries(flix PRIVATE flix_core)
 
-# Compiler
 add_executable(flixc
     src/compiler/main.cpp
 )
 
 target_link_libraries(flixc PRIVATE flix_core)
 
-# Output directory
 set_target_properties(flix flixc PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
