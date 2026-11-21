@@ -1,3 +1,4 @@
+
 #pragma once
 
 #include <cstddef>
@@ -16,7 +17,7 @@ enum class ValueType {
 
 struct Variable {
     std::string name;
-    ValueType type;
+    ValueType type = ValueType::Integer;
     std::string initial_value;
     int line = 0;
 };
@@ -26,6 +27,12 @@ struct Instruction {
     std::string operand;
     int line = 0;
     int indentation = 0;
+
+    // Conditional-chain metadata.
+    int branch_id = -1;
+    bool branch_first = false;
+    std::size_t branch_next = 0;
+    std::size_t branch_end = 0;
 };
 
 struct Program {
