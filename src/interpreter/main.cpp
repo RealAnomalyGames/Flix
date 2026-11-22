@@ -724,6 +724,18 @@ int main(int argc, char* argv[]) {
                 continue;
             }
 
+            // A regular instruction at the same indentation level
+            // as a conditional marker ends that conditional block.
+            //
+            // This must happen after handling cmp and el so that
+            // else-if and else branches remain connected.
+            while (!conditionalIndent.empty() &&
+                   ins.indentation <= conditionalIndent.back()) {
+                conditionalIndent.pop_back();
+                conditionalActive.pop_back();
+                branchTaken.pop_back();
+            }
+            
             if (!active(conditionalActive)) {
                 ++pc;
                 continue;
