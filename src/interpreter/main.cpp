@@ -321,6 +321,36 @@ Value resolve(const std::string& token, const Variables& vars) {
     throw std::runtime_error("Unknown value or variable '" + s + "'.");
 }
 
+std::string resolveOutput(
+    const std::string& operand,
+    const Variables& vars
+) {
+    const std::string value = trim(operand);
+
+    // Variable output.
+    const auto found = vars.find(value);
+
+    if (found != vars.end()) {
+        return found->second.data;
+    }
+
+    // Quoted string output.
+    if (value.size() >= 2 &&
+        value.front() == '"' &&
+        value.back() == '"') {
+        return decodeString(value);
+    }
+
+    // Boolean and numeric output.
+    if (value == "true" || value == "false" ||
+        isNumber(value)) {
+        return resolve(value, vars).data;
+    }
+
+    // Allow unquoted text in output instructions.
+    return value;
+}
+
 std::size_t findOperator(
     const std::string& s,
     const std::vector<std::string>& operators
@@ -702,12 +732,13 @@ int main(int argc, char* argv[]) {
             const std::string& op = ins.opcode;
 
             if (op == "out" || op == "outln") {
-                Value value = resolve(ins.operand, vars);
+                std::cout << resolveOutput(ins.operand, vars);
 
-                std::cout << value.data;
-
-                if (op == "outln")
+                if (op == "outln") {
                     std::cout << '\n';
+                }
+
+                std::cout.flush();
 
             } else if (op == "mov") {
                 const auto comma = ins.operand.find(',');
@@ -733,7 +764,8 @@ int main(int argc, char* argv[]) {
                 target->second.data = value.data;
 
             } else if (op == "jmp") {
-                pc = program.labels.at(ins.operand);
+                const std::string label = ins.operand.substr(1);
+                pc = program.labels.at(label);
                 continue;
 
             } else if (op == "halt") {
