@@ -33,9 +33,14 @@ target_link_libraries(flix PRIVATE flix_core)
 
 add_executable(flixc
     src/compiler/main.cpp
+    src/compiler/codegen.cpp
 )
 
 target_link_libraries(flixc PRIVATE flix_core)
+
+target_include_directories(flixc PRIVATE
+    src/core/include
+)
 
 set_target_properties(flix flixc PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
