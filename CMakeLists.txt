@@ -42,6 +42,21 @@ target_include_directories(flixc PRIVATE
     src/core/include
 )
 
+add_custom_command(TARGET flixc POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E make_directory
+        "$<TARGET_FILE_DIR:flixc>/compiler/include"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/compiler/runtime.c"
+        "$<TARGET_FILE_DIR:flixc>/compiler/runtime.c"
+
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/core/include/flix/runtime.h"
+        "$<TARGET_FILE_DIR:flixc>/compiler/include/runtime.h"
+
+    COMMENT "Preparing bundled Flix compiler runtime"
+)
+
 set_target_properties(flix flixc PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
 )
