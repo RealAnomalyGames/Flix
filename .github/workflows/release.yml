@@ -26,6 +26,49 @@ jobs:
 
       - name: Compile Flix
         run: cmake --build build --config Release --parallel
+      
+      - name: Download bundled Zig toolchain
+        shell: pwsh
+        run: |
+          $zigVersion = "0.14.1"
+          $archive = "$env:RUNNER_TEMP\zig.zip"
+          $extract = "$env:RUNNER_TEMP\zig-extract"
+
+          $url = "https://ziglang.org/download/$zigVersion/zig-x86_64-windows-$zigVersion.zip"
+
+          Invoke-WebRequest -Uri $url -OutFile $archive
+
+          Expand-Archive `
+            -Path $archive `
+            -DestinationPath $extract `
+            -Force
+
+          $zigExe = Get-ChildItem `
+            -Path $extract `
+            -Filter "zig.exe" `
+            -Recurse |
+            Select-Object -First 1
+
+          if (-not $zigExe) {
+            throw "The Zig compiler was not found in the downloaded archive."
+          }
+
+          $zigRoot = $zigExe.Directory.FullName
+          $destination = "dist/compiler/toolchain"
+
+          New-Item -ItemType Directory -Force -Path $destination | Out-Null
+
+          Copy-Item `
+            -Path "$zigRoot\*" `
+            -Destination $destination `
+            -Recurse `
+            -Force
+
+          & "$destination/zig.exe" version
+
+          if ($LASTEXITCODE -ne 0) {
+            throw "Bundled Zig compiler verification failed."
+          }
 
       - name: Check Flix compiler version
         run: build/bin/Release/flixc.exe version
